@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GraduationCap, Moon, ShoppingBag, ShoppingCart, Sun, User, UserCircle, UserIcon } from "lucide-react";
+import { CircleUser, GraduationCap, Moon, ShoppingBag, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -166,7 +166,7 @@ const Header = () => {
             aria-label="Tài khoản"
             className={buttonVariants({ variant: "ghost", size: "icon" })}
           >
-            <UserCircle className="size-5" strokeWidth={1.75} />
+            <CircleUser className="size-5" strokeWidth={1.75} />
           </a>
 
           <Sheet open={open} onOpenChange={setOpen}>

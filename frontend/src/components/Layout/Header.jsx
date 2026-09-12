@@ -103,6 +103,22 @@ function logout() {
   window.location.href = "/";
 }
 
+function UserMenuLink({ href, children, count }) {
+  return (
+    <DropdownMenuItem
+      className="h-9 justify-between px-2 text-[14px]"
+      render={<a href={href} />}
+    >
+      <span>{children}</span>
+      {count ? (
+        <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground">
+          {count}
+        </span>
+      ) : null}
+    </DropdownMenuItem>
+  );
+}
+
 function UserMenu({ user }) {
   return (
     <DropdownMenu>
@@ -114,15 +130,41 @@ function UserMenu({ user }) {
         aria-label="Tài khoản"
       >
         <Avatar size="sm">
-          <AvatarFallback className="bg-foreground text-[11px] font-medium text-background">
+          <AvatarFallback
+            className="bg-foreground text-[11px] font-medium text-background"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "10px",
+              fontWeight: "500",
+              fontStyle: "normal",
+              lineHeight: 1.2,
+              letterSpacing: "0.01em",
+              textAlign: "center",
+              justifyContent: "center",
+              alignContent: "ce",
+            }}
+          >
             {userInitials(user)}
           </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-64 w-72 p-2">
+      <DropdownMenuContent align="end" className="min-w-64 w-80 p-2">
         <div className="flex items-center gap-3 rounded-md px-2 py-2">
           <Avatar>
-            <AvatarFallback className="bg-foreground text-xs font-medium text-background">
+            <AvatarFallback
+              className="bg-foreground text-xs font-medium text-background"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: "13px",
+                fontWeight: "600",
+                fontStyle: "normal",
+                lineHeight: 1.2,
+                letterSpacing: "0.01em",
+                textAlign: "center",
+                justifyContent: "center",
+                alignContent: "ce",
+              }}
+            >
               {userInitials(user)}
             </AvatarFallback>
           </Avatar>
@@ -137,6 +179,30 @@ function UserMenu({ user }) {
               {roleLabel(user.role)}
             </Badge>
           </div>
+        </div>
+        <DropdownMenuSeparator />
+        <UserMenuLink href="/hoc-tap">Học tập</UserMenuLink>
+        <DropdownMenuSeparator />
+        <UserMenuLink href="/gio-hang">Giỏ hàng của tôi</UserMenuLink>
+        <UserMenuLink href="/danh-sach-mong-uoc">
+          Danh sách mong ước
+        </UserMenuLink>
+        <UserMenuLink href="/giang-day">Giảng dạy trên LearnHub</UserMenuLink>
+        <DropdownMenuSeparator />
+        <UserMenuLink href="/thong-bao">Thông báo</UserMenuLink>
+        <UserMenuLink href="/tin-nhan">Tin nhắn</UserMenuLink>
+        <DropdownMenuSeparator />
+        <UserMenuLink href="/cai-dat-tai-khoan">Cài đặt tài khoản</UserMenuLink>
+        <UserMenuLink href="/phuong-thuc-thanh-toan">
+          Phương thức thanh toán
+        </UserMenuLink>
+        <UserMenuLink href="/thue-bao">Thuê bao</UserMenuLink>
+        <UserMenuLink href="/uu-dai">Ưu đãi LearnHub</UserMenuLink>
+        <UserMenuLink href="/lich-su-mua">Lịch sử mua</UserMenuLink>
+        <DropdownMenuSeparator />
+        <div className="flex items-center justify-between px-2 py-2 text-[14px]">
+          <span>Ngôn ngữ</span>
+          <span className="text-muted-foreground">Tiếng Việt</span>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={logout}>

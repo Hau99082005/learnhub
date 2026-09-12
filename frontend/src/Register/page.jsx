@@ -1,19 +1,19 @@
-import { useState } from "react"
-import { Mail, User } from "lucide-react"
-import AuthLayout from "@/components/auth/AuthLayout"
-import TextField from "@/components/auth/TextField"
-import PasswordField from "@/components/auth/PasswordField"
-import SocialAuth from "@/components/auth/SocialAuth"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
+import { useState } from "react";
+import { Mail, User } from "lucide-react";
+import AuthLayout from "@/components/auth/AuthLayout";
+import TextField from "@/components/auth/TextField";
+import PasswordField from "@/components/auth/PasswordField";
+import SocialAuth from "@/components/auth/SocialAuth";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const Page = () => {
-  const [agree, setAgree] = useState(false)
+  const [agree, setAgree] = useState(false);
 
   const onSubmit = (event) => {
-    event.preventDefault()
-  }
+    event.preventDefault();
+  };
 
   return (
     <AuthLayout
@@ -32,7 +32,7 @@ const Page = () => {
           name="name"
           autoComplete="name"
           required
-          placeholder="Nguyễn Văn A"
+          placeholder="Nhập vào họ tên"
         />
         <TextField
           id="register-email"
@@ -42,7 +42,7 @@ const Page = () => {
           name="email"
           autoComplete="email"
           required
-          placeholder="you@email.com"
+          placeholder="Nhập vào email của bạn"
         />
         <PasswordField
           id="register-password"
@@ -70,24 +70,51 @@ const Page = () => {
             onCheckedChange={(value) => setAgree(value === true)}
             required
           />
-          <Label htmlFor="terms" className="text-[14px] leading-[1.4] font-normal tracking-[0.01em]">
+          <Label
+            htmlFor="terms"
+            className="text-[14px] leading-[1.4] font-normal tracking-[0.01em]"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontWeight: "400",
+              fontStyle: "normal",
+              lineHeight: 1.3,
+              letterSpacing: "0.01em",
+            }}
+          >
             Tôi đồng ý với{" "}
-            <a href="/dieu-khoan" className="font-medium text-foreground hover:underline">
+            <a
+              href="/dieu-khoan"
+              className="font-medium text-foreground hover:underline"
+            >
               Điều khoản
             </a>{" "}
             và{" "}
-            <a href="/bao-mat" className="font-medium text-foreground hover:underline">
+            <a
+              href="/bao-mat"
+              className="font-medium text-foreground hover:underline"
+            >
               Chính sách bảo mật
             </a>
           </Label>
         </div>
-        <Button type="submit" className="h-11 w-full text-[16px] font-medium tracking-[0.01em]">
+        <Button
+          style={{
+            fontFamily: "'Roboto', sans-serif",
+            fontSize: "16px",
+            fontWeight: "400",
+            lineHeight: 1.3,
+            letterSpacing: "0.01em",
+            borderRadius: "5px",
+          }}
+          type="submit"
+          className="h-11 w-full text-[16px] font-medium tracking-[0.01em]"
+        >
           Tạo tài khoản
         </Button>
       </form>
       <SocialAuth />
     </AuthLayout>
-  )
-}
+  );
+};
 
-export default Page
+export default Page;

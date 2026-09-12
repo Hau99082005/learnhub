@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { CircleUser, GraduationCap, Moon, ShoppingBag, Sun } from "lucide-react";
+import {
+  CircleUser,
+  GraduationCap,
+  Lightbulb,
+  Lighthouse,
+  Moon,
+  ShoppingBag,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -42,7 +49,7 @@ const ThemeToggle = () => {
       aria-label={isDark ? "Bật chế độ sáng" : "Bật chế độ tối"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
-      <Sun
+      <Lightbulb
         className={cn(
           "size-5 transition-all duration-300",
           isDark

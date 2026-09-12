@@ -7,12 +7,54 @@ import SocialAuth from "@/components/auth/SocialAuth";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { authRequest, saveAuth, setPendingToast } from "@/lib/auth";
+import { hasErrors, validateLogin } from "@/lib/validate";
 
 const Page = () => {
+  const [values, setValues] = useState({
+    email: "",
+    password: "",
+  });
   const [remember, setRemember] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
-  const onSubmit = (event) => {
+  const setField = (name) => (event) => {
+    const value = event.target.value;
+    setValues((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: "", form: "" }));
+  };
+
+  const onBlur = (name) => () => {
+    const next = validateLogin(values);
+    setErrors((prev) => ({ ...prev, [name]: next[name] || "" }));
+  };
+
+  const onSubmit = async (event) => {
     event.preventDefault();
+    const next = validateLogin(values);
+    setErrors(next);
+    if (hasErrors(next)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await authRequest("/api/auth/login", {
+        email: values.email.trim(),
+        password: values.password,
+      });
+      saveAuth(data);
+      setPendingToast("success", "Đăng nhập thành công");
+      window.location.href = "/";
+    } catch (err) {
+      if (err.field) {
+        setErrors({ [err.field]: err.message });
+      } else {
+        setErrors({ form: err.message });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -23,7 +65,7 @@ const Page = () => {
       switchHref="/dang-ky"
       switchLabel="Đăng ký"
     >
-      <form onSubmit={onSubmit} className="mt-6 grid gap-4">
+      <form noValidate onSubmit={onSubmit} className="mt-6 grid gap-4">
         <TextField
           id="login-email"
           label="Email"
@@ -31,17 +73,26 @@ const Page = () => {
           type="email"
           name="email"
           autoComplete="email"
-          required
           placeholder="Nhập vào email của bạn"
+          value={values.email}
+          onChange={setField("email")}
+          onBlur={onBlur("email")}
+          error={errors.email}
         />
         <PasswordField
           id="login-password"
           label="Mật khẩu"
           name="password"
           autoComplete="current-password"
-          required
           placeholder="Nhập mật khẩu"
+          value={values.password}
+          onChange={setField("password")}
+          onBlur={onBlur("password")}
+          error={errors.password}
         />
+        {errors.form ? (
+          <p className="text-[13px] text-destructive">{errors.form}</p>
+        ) : null}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Checkbox
@@ -87,9 +138,10 @@ const Page = () => {
             borderRadius: "5px",
           }}
           type="submit"
+          disabled={loading}
           className="h-12 w-full text-[16px] font-medium tracking-[0.01em]"
         >
-          Đăng nhập
+          {loading ? "Đang đăng nhập..." : "Đăng nhập"}
         </Button>
       </form>
       <SocialAuth />

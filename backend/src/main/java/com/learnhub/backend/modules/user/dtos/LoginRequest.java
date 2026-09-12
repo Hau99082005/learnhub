@@ -2,7 +2,7 @@ package com.learnhub.backend.modules.user.dtos;
 
 public class LoginRequest {
     private String email;
-    private String password_hash;
+    private String password;
 
     public String getEmail() {
         return email;
@@ -12,11 +12,11 @@ public class LoginRequest {
         this.email = email;
     }
 
-    public String getPassword_hash() {
-        return password_hash;
+    public String getPassword() {
+        return password;
     }
 
-    public void setPassword_hash(String password_hash) {
-        this.password_hash = password_hash;
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

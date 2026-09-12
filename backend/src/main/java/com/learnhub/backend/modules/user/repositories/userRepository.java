@@ -1,10 +1,17 @@
 package com.learnhub.backend.modules.user.repositories;
 
-import org.springframework.stereotype.Repository;
+import java.util.Optional;
 
-import com.learnhub.backend.repositories.BaseRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-@Repository 
-public class userRepository extends BaseRepository{
-    
+import com.learnhub.backend.modules.user.models.user;
+
+public interface userRepository extends JpaRepository<user, Long> {
+    Optional<user> findByEmail(String email);
+
+    boolean existsByEmail(String email);
+
+    boolean existsByUsername(String username);
+
+    boolean existsByPhone(String phone);
 }

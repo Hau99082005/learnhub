@@ -3,13 +3,22 @@ import {
   CircleUser,
   GraduationCap,
   Lightbulb,
-  Lighthouse,
+  LogOut,
   Moon,
   ShoppingBag,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetClose,
@@ -19,6 +28,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  clearAuth,
+  getAuthUser,
+  onAuthChange,
+  setPendingToast,
+} from "@/lib/auth";
+import { roleLabel } from "@/lib/roles";
 
 const NAV_ITEMS = [
   { href: "/", label: "Trang chủ" },
@@ -71,17 +87,84 @@ const ThemeToggle = () => {
   );
 };
 
+function userInitials(user) {
+  const name = user?.fullName?.trim();
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    const letters = (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
+    return letters.toUpperCase() || "U";
+  }
+  return (user?.email?.[0] || "U").toUpperCase();
+}
+
+function logout() {
+  clearAuth();
+  setPendingToast("success", "Đã đăng xuất");
+  window.location.href = "/";
+}
+
+function UserMenu({ user }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "icon" }),
+          "rounded-full",
+        )}
+        aria-label="Tài khoản"
+      >
+        <Avatar size="sm">
+          <AvatarFallback className="bg-foreground text-[11px] font-medium text-background">
+            {userInitials(user)}
+          </AvatarFallback>
+        </Avatar>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-64 w-72 p-2">
+        <div className="flex items-center gap-3 rounded-md px-2 py-2">
+          <Avatar>
+            <AvatarFallback className="bg-foreground text-xs font-medium text-background">
+              {userInitials(user)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">
+              {user.fullName || "Học viên"}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {user.email}
+            </p>
+            <Badge variant="secondary" className="mt-1">
+              {roleLabel(user.role)}
+            </Badge>
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={logout}>
+          <LogOut />
+          Đăng xuất
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [path, setPath] = useState("/");
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     setPath(window.location.pathname);
+    setUser(getAuthUser());
+    const unsubscribe = onAuthChange(setUser);
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   return (
@@ -168,13 +251,17 @@ const Header = () => {
             <ShoppingBag className="size-5" strokeWidth={1.75} />
           </a>
 
-          <a
-            href="/dang-nhap"
-            aria-label="Tài khoản"
-            className={buttonVariants({ variant: "ghost", size: "icon" })}
-          >
-            <CircleUser className="size-5" strokeWidth={1.75} />
-          </a>
+          {user ? (
+            <UserMenu user={user} />
+          ) : (
+            <a
+              href="/dang-nhap"
+              aria-label="Tài khoản"
+              className={buttonVariants({ variant: "ghost", size: "icon" })}
+            >
+              <CircleUser className="size-5" strokeWidth={1.75} />
+            </a>
+          )}
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
@@ -223,6 +310,26 @@ const Header = () => {
                   Menu điều hướng website khóa học
                 </SheetDescription>
               </SheetHeader>
+              {user ? (
+                <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+                  <Avatar>
+                    <AvatarFallback className="bg-foreground text-xs font-medium text-background">
+                      {userInitials(user)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {user.fullName || "Học viên"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {user.email}
+                    </p>
+                    <Badge variant="secondary" className="mt-1">
+                      {roleLabel(user.role)}
+                    </Badge>
+                  </div>
+                </div>
+              ) : null}
               <nav className="flex-1 px-3 py-3" aria-label="Menu di động">
                 <ul className="flex flex-col">
                   {NAV_ITEMS.map((item, index) => {
@@ -251,6 +358,19 @@ const Header = () => {
                   })}
                 </ul>
               </nav>
+              {user ? (
+                <div className="border-t border-border p-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-11 w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={logout}
+                  >
+                    <LogOut className="size-4" />
+                    Đăng xuất
+                  </Button>
+                </div>
+              ) : null}
             </SheetContent>
           </Sheet>
         </div>

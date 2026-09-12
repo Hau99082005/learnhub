@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.learnhub.backend.modules.user.dtos.LoginReponse;
 import com.learnhub.backend.modules.user.dtos.LoginRequest;
+import com.learnhub.backend.modules.user.dtos.RegisterRequest;
 import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfaces;
 
 @RestController
@@ -16,12 +17,16 @@ public class AuthController {
     private final UserServicesInterfaces userServices;
 
     public AuthController(UserServicesInterfaces userServices) {
-         this.userServices = userServices;
-    } 
+        this.userServices = userServices;
+    }
+
     @PostMapping("/login")
     public ResponseEntity<LoginReponse> login(@RequestBody LoginRequest request) {
-    
-       LoginReponse auth = userServices.login(request);
-       return ResponseEntity.ok(auth);
+        return ResponseEntity.ok(userServices.login(request));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<LoginReponse> register(@RequestBody RegisterRequest request) {
+        return ResponseEntity.ok(userServices.register(request));
     }
 }

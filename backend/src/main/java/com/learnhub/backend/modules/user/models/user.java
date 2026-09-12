@@ -4,9 +4,12 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -21,8 +24,12 @@ public class user {
     @Column(name = "firebase_uid", nullable = false, unique = true, length = 255)
     private String firebaseUid;
 
-    @Column(name = "user_catalogue_id")
-    private Long userCatalogueId;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_catalogue_id")
+    private userCatalogue userCatalogue;
+
+    @Column(nullable = false, length = 20)
+    private String role = "USER";
 
     @Column(nullable = false, unique = true, length = 255)
     private String username;
@@ -45,8 +52,8 @@ public class user {
     @Column(name = "full_name", length = 255)
     private String fullName;
 
-    @Column(columnDefinition = "TEXT")
-    private String bio;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String bio = "";
 
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
@@ -77,6 +84,12 @@ public class user {
         if (emailVerified == null) {
             emailVerified = false;
         }
+        if (bio == null) {
+            bio = "";
+        }
+        if (role == null || role.isBlank()) {
+            role = UserRole.USER.name();
+        }
     }
 
     @PreUpdate
@@ -100,12 +113,20 @@ public class user {
         this.firebaseUid = firebaseUid;
     }
 
-    public Long getUserCatalogueId() {
-        return userCatalogueId;
+    public userCatalogue getUserCatalogue() {
+        return userCatalogue;
     }
 
-    public void setUserCatalogueId(Long userCatalogueId) {
-        this.userCatalogueId = userCatalogueId;
+    public void setUserCatalogue(userCatalogue userCatalogue) {
+        this.userCatalogue = userCatalogue;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public String getUsername() {

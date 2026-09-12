@@ -3,7 +3,7 @@ import { Eye, EyeOff, Lock } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 
-const PasswordField = ({ id, label, ...props }) => {
+const PasswordField = ({ id, label, error, ...props }) => {
   const [visible, setVisible] = useState(false)
 
   return (
@@ -19,6 +19,7 @@ const PasswordField = ({ id, label, ...props }) => {
         <Input
           id={id}
           type={visible ? "text" : "password"}
+          aria-invalid={error ? true : undefined}
           className="h-11 rounded-lg pr-10 pl-10 text-[16px] md:text-[16px]"
           {...props}
         />
@@ -35,6 +36,9 @@ const PasswordField = ({ id, label, ...props }) => {
           )}
         </button>
       </div>
+      {error ? (
+        <p className="text-[13px] text-destructive">{error}</p>
+      ) : null}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
-const TextField = ({ id, label, icon: Icon, className, ...props }) => {
+const TextField = ({ id, label, icon: Icon, className, error, ...props }) => {
   return (
     <div className="grid gap-2">
       <Label
@@ -26,6 +26,7 @@ const TextField = ({ id, label, icon: Icon, className, ...props }) => {
         ) : null}
         <Input
           id={id}
+          aria-invalid={error ? true : undefined}
           className={`h-11 rounded-lg text-[16px] md:text-[16px] ${Icon ? "pl-10" : "px-3"} ${className ?? ""}`}
           {...props}
           style={{
@@ -37,6 +38,9 @@ const TextField = ({ id, label, icon: Icon, className, ...props }) => {
           }}
         />
       </div>
+      {error ? (
+        <p className="text-[13px] text-destructive">{error}</p>
+      ) : null}
     </div>
   );
 };

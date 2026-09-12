@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { lazy, Suspense, useEffect } from "react"
 import { toast } from "sonner"
 import Header from "@/components/Layout/Header"
 import Footer from "@/components/Layout/footer"
@@ -7,10 +7,13 @@ import RegisterPage from "@/Register/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast } from "@/lib/auth"
 
+const AdminPage = lazy(() => import("@/admin/page"))
+
 function App() {
   const path = window.location.pathname
   const isLogin = path === "/dang-nhap"
   const isRegister = path === "/dang-ky"
+  const isAdminPage = path === "/quan-tri" || path.startsWith("/quan-tri/")
 
   useEffect(() => {
     const pending = consumePendingToast()
@@ -23,6 +26,17 @@ function App() {
     }
     toast.success(pending.message)
   }, [])
+
+  if (isAdminPage) {
+    return (
+      <>
+        <Suspense fallback={<div className="min-h-screen bg-background" />}>
+          <AdminPage />
+        </Suspense>
+        <Toaster position="top-center" richColors />
+      </>
+    )
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

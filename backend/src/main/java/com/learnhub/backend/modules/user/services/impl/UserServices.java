@@ -19,6 +19,7 @@ import com.learnhub.backend.modules.user.models.user;
 import com.learnhub.backend.modules.user.models.userCatalogue;
 import com.learnhub.backend.modules.user.repositories.userCatalogueRepository;
 import com.learnhub.backend.modules.user.repositories.userRepository;
+import com.learnhub.backend.modules.user.services.AuthSessionService;
 import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfaces;
 import com.learnhub.backend.services.BaseServices;
 
@@ -29,11 +30,17 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
     private final userRepository users;
     private final userCatalogueRepository catalogues;
     private final PasswordEncoder passwordEncoder;
+    private final AuthSessionService sessions;
 
-    public UserServices(userRepository users, userCatalogueRepository catalogues, PasswordEncoder passwordEncoder) {
+    public UserServices(
+            userRepository users,
+            userCatalogueRepository catalogues,
+            PasswordEncoder passwordEncoder,
+            AuthSessionService sessions) {
         this.users = users;
         this.catalogues = catalogues;
         this.passwordEncoder = passwordEncoder;
+        this.sessions = sessions;
     }
 
     @Override
@@ -122,15 +129,59 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
         return toAuthResponse(account);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public userDTO me(String authorization) {
+        return toUserDto(requireAccount(authorization));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public userDTO requireAdmin(String authorization) {
+        user account = requireAccount(authorization);
+        if (resolveRole(account) != UserRole.ADMIN) {
+            throw new AuthException(HttpStatus.FORBIDDEN, "Bạn không có quyền truy cập trang quản trị");
+        }
+        return toUserDto(account);
+    }
+
     private LoginReponse toAuthResponse(user account) {
-        UserRole role = resolveRole(account);
-        return new LoginReponse(
-                UUID.randomUUID().toString(),
-                new userDTO(
-                        account.getId(),
-                        account.getEmail(),
-                        account.getFullName(),
-                        role.name()));
+        String token = UUID.randomUUID().toString();
+        sessions.save(token, account.getId());
+        return new LoginReponse(token, toUserDto(account));
+    }
+
+    private userDTO toUserDto(user account) {
+        return new userDTO(
+                account.getId(),
+                account.getEmail(),
+                account.getFullName(),
+                resolveRole(account).name());
+    }
+
+    private user requireAccount(String authorization) {
+        String token = extractToken(authorization);
+        Long userId = sessions.findUserId(token);
+        if (userId == null) {
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
+        }
+        user account = users.findById(userId)
+                .orElseThrow(() -> new AuthException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+        if (account.getDeletedAt() != null || !"ACTIVE".equalsIgnoreCase(account.getStatus())) {
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "Tài khoản không khả dụng");
+        }
+        return account;
+    }
+
+    private String extractToken(String authorization) {
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
+        }
+        String token = authorization.substring(7).trim();
+        if (token.isBlank()) {
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
+        }
+        return token;
     }
 
     private void applyRole(user account, UserRole role) {
@@ -142,10 +193,14 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
     }
 
     private UserRole resolveRole(user account) {
+        UserRole fromColumn = UserRole.from(account.getRole());
+        if (fromColumn == UserRole.ADMIN) {
+            return UserRole.ADMIN;
+        }
         if (account.getUserCatalogue() != null && account.getUserCatalogue().getCanonical() != null) {
             return UserRole.from(account.getUserCatalogue().getCanonical());
         }
-        return UserRole.from(account.getRole());
+        return fromColumn;
     }
 
     private userCatalogue requireCatalogue(UserRole role) {

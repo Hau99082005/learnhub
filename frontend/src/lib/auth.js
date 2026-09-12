@@ -44,6 +44,24 @@ export function saveAuth(data) {
   notifyAuth()
 }
 
+export function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export async function authGet(path) {
+  const token = getAuthToken()
+  const response = await fetch(path, {
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+  }
+  return data
+}
+
 export function getAuthUser() {
   const raw = localStorage.getItem(USER_KEY)
   if (!raw) {

@@ -34,7 +34,7 @@ import {
   onAuthChange,
   setPendingToast,
 } from "@/lib/auth";
-import { roleLabel } from "@/lib/roles";
+import { isAdmin, roleLabel } from "@/lib/roles";
 
 const NAV_ITEMS = [
   { href: "/", label: "Trang chủ" },
@@ -180,6 +180,12 @@ function UserMenu({ user }) {
             </Badge>
           </div>
         </div>
+        {isAdmin(user) ? (
+          <>
+            <DropdownMenuSeparator />
+            <UserMenuLink href="/quan-tri">Trang quản trị</UserMenuLink>
+          </>
+        ) : null}
         <DropdownMenuSeparator />
         <UserMenuLink href="/hoc-tap">Học tập</UserMenuLink>
         <DropdownMenuSeparator />
@@ -426,6 +432,18 @@ const Header = () => {
               </nav>
               {user ? (
                 <div className="border-t border-border p-3">
+                  {isAdmin(user) ? (
+                    <SheetClose
+                      render={
+                        <a
+                          href="/quan-tri"
+                          className="mb-1 flex h-11 items-center rounded-lg px-3 text-sm font-medium text-foreground hover:bg-muted"
+                        />
+                      }
+                    >
+                      Trang quản trị
+                    </SheetClose>
+                  ) : null}
                   <Button
                     type="button"
                     variant="ghost"

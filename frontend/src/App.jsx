@@ -13,7 +13,11 @@ function App() {
   const path = window.location.pathname
   const isLogin = path === "/dang-nhap"
   const isRegister = path === "/dang-ky"
-  const isAdminPage = path === "/quan-tri" || path.startsWith("/quan-tri/")
+  const isAdminPage =
+    path === "/quan-tri" ||
+    path.startsWith("/quan-tri/") ||
+    path === "/admin" ||
+    path.startsWith("/admin/")
 
   useEffect(() => {
     const pending = consumePendingToast()

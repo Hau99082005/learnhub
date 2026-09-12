@@ -18,6 +18,7 @@ import {
   Sun,
   Table2,
   PanelsTopLeft,
+  Images,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -44,14 +45,13 @@ const NAV_GROUPS = [
         label: "Dashboard",
         icon: LayoutDashboard,
         badge: "NEW",
-        active: true,
       },
     ],
   },
   {
     title: "UI Elements",
     items: [
-      { href: "/quan-tri/bieu-do", label: "Charts", icon: ChartLine },
+      { href: "/admin/banners", label: "Banners", icon: Images },
       {
         href: "/quan-tri/thanh-phan",
         label: "Components",
@@ -255,7 +255,7 @@ function Sidebar({ path }) {
             <ul className="grid gap-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = path === item.href || item.active;
+                const active = path === item.href;
                 return (
                   <li key={item.href}>
                     <a

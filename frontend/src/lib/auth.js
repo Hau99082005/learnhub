@@ -62,6 +62,37 @@ export async function authGet(path) {
   return data
 }
 
+export async function authDelete(path) {
+  const token = getAuthToken()
+  const response = await fetch(path, {
+    method: "DELETE",
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  })
+  if (response.status === 204 || response.ok) {
+    return true
+  }
+  const data = await response.json().catch(() => ({}))
+  throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+}
+
+export async function authForm(path, formData, method = "POST") {
+  const token = getAuthToken()
+  const response = await fetch(path, {
+    method,
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    body: formData,
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+  }
+  return data
+}
+
 export function getAuthUser() {
   const raw = localStorage.getItem(USER_KEY)
   if (!raw) {

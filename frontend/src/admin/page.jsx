@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { authGet, getAuthUser, setPendingToast } from "@/lib/auth";
 import { isAdmin } from "@/lib/roles";
 import AdminLayout from "@/admin/layout";
+import { AllBanner } from "@/admin/banners/AllBanner";
 
 const STATS = [
   {
@@ -201,8 +202,19 @@ const Page = () => {
     return <main className="flex-1" />;
   }
 
+  const path = window.location.pathname;
+  const isBanners = path === "/admin/banners" || path === "/quan-tri/banners";
+
   return (
     <AdminLayout user={admin}>
+      {isBanners ? <AllBanner /> : <DashboardView />}
+    </AdminLayout>
+  );
+};
+
+function DashboardView() {
+  return (
+    <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {STATS.map((item) => (
           <StatCard key={item.label} item={item} />
@@ -315,8 +327,8 @@ const Page = () => {
           </ResponsiveContainer>
         </div>
       </section>
-    </AdminLayout>
+    </>
   );
-};
+}
 
 export default Page;

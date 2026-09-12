@@ -36,3 +36,4 @@ build/
 .env
 firebase-service-account.json
 *-firebase-adminsdk-*.json
+uploads/

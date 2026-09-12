@@ -14,8 +14,9 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, String>> handleAuth(AuthException exception) {
         Map<String, String> body = new LinkedHashMap<>();
         body.put("message", exception.getMessage());
-        if (exception.getField() != null && !exception.getField().isBlank()) {
-            body.put("field", exception.getField());
+        String errorField = exception.getErrorField();
+        if (errorField != null && !errorField.isBlank()) {
+            body.put("field", errorField);
         }
         return ResponseEntity.status(exception.getStatus()).body(body);
     }

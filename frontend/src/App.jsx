@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react"
 import { toast } from "sonner"
 import Header from "@/components/Layout/Header"
 import Footer from "@/components/Layout/footer"
+import Banner from "@/components/Banner"
 import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
 import { Toaster } from "@/components/ui/sonner"
@@ -45,7 +46,13 @@ function App() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      {isLogin ? <LoginPage /> : isRegister ? <RegisterPage /> : <main className="flex-1" />}
+      {isLogin ? (
+        <LoginPage />
+      ) : isRegister ? (
+        <RegisterPage />
+      ) : (
+        <main className="flex-1">{path === "/" ? <Banner /> : null}</main>
+      )}
       <Footer />
       <Toaster position="top-center" richColors />
     </div>

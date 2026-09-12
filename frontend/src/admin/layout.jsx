@@ -19,6 +19,7 @@ import {
   Table2,
   PanelsTopLeft,
   Images,
+  Tags,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -52,6 +53,7 @@ const NAV_GROUPS = [
     title: "UI Elements",
     items: [
       { href: "/admin/banners", label: "Banners", icon: Images },
+      { href: "/admin/categories", label: "Danh mục", icon: Tags },
       {
         href: "/quan-tri/thanh-phan",
         label: "Components",

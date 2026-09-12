@@ -21,6 +21,7 @@ import { authGet, getAuthUser, setPendingToast } from "@/lib/auth";
 import { isAdmin } from "@/lib/roles";
 import AdminLayout from "@/admin/layout";
 import { AllBanner } from "@/admin/banners/AllBanner";
+import { AllCategory } from "@/admin/categories/AllCategory";
 
 const STATS = [
   {
@@ -204,10 +205,11 @@ const Page = () => {
 
   const path = window.location.pathname;
   const isBanners = path === "/admin/banners" || path === "/quan-tri/banners";
+  const isCategories = path === "/admin/categories" || path === "/quan-tri/categories";
 
   return (
     <AdminLayout user={admin}>
-      {isBanners ? <AllBanner /> : <DashboardView />}
+      {isBanners ? <AllBanner /> : isCategories ? <AllCategory /> : <DashboardView />}
     </AdminLayout>
   );
 };

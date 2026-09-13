@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { authRequest, saveAuth, setPendingToast } from "@/lib/auth"
+import { clearTeachStart } from "@/lib/teachStart"
 import { signInWithGoogle } from "@/lib/firebase"
 
 const buttonStyle = {
@@ -16,7 +17,7 @@ const buttonStyle = {
   borderRadius: "5px",
 }
 
-const SocialAuth = ({ role, onBeforeGoogle }) => {
+const SocialAuth = ({ role, onBeforeGoogle, extraBody, redirectTo }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -35,10 +36,12 @@ const SocialAuth = ({ role, onBeforeGoogle }) => {
       const data = await authRequest("/api/auth/google", {
         idToken,
         role,
+        ...(extraBody || {}),
       })
       saveAuth(data)
+      clearTeachStart()
       setPendingToast("success", "Đăng nhập thành công")
-      window.location.href = "/"
+      window.location.href = redirectTo || "/"
     } catch (err) {
       setError(err.message || "Đăng nhập Google thất bại")
     } finally {

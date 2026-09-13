@@ -34,7 +34,7 @@ import {
   onAuthChange,
   setPendingToast,
 } from "@/lib/auth";
-import { isAdmin, roleLabel } from "@/lib/roles";
+import { isAdmin, isInstructor, roleLabel } from "@/lib/roles";
 
 const NAV_ITEMS = [
   { href: "/", label: "Trang chủ" },
@@ -194,6 +194,9 @@ function UserMenu({ user }) {
           Danh sách mong ước
         </UserMenuLink>
         <UserMenuLink href="/giang-day">Giảng dạy trên LearnHub</UserMenuLink>
+        {isInstructor(user) ? (
+          <UserMenuLink href="/giang-day/quan-tri">Quản lý khóa học</UserMenuLink>
+        ) : null}
         <DropdownMenuSeparator />
         <UserMenuLink href="/thong-bao">Thông báo</UserMenuLink>
         <UserMenuLink href="/tin-nhan">Tin nhắn</UserMenuLink>

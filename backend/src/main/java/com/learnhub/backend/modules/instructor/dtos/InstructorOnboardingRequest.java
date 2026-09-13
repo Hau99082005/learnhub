@@ -1,27 +1,9 @@
-package com.learnhub.backend.modules.user.dtos;
+package com.learnhub.backend.modules.instructor.dtos;
 
-public class GoogleAuthRequest {
-    private String idToken;
-    private String role;
+public class InstructorOnboardingRequest {
     private String teachingFormat;
     private String recordingExperience;
     private String audienceSize;
-
-    public String getIdToken() {
-        return idToken;
-    }
-
-    public void setIdToken(String idToken) {
-        this.idToken = idToken;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
 
     public String getTeachingFormat() {
         return teachingFormat;

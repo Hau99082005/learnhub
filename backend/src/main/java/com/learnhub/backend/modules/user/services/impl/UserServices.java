@@ -14,6 +14,8 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import com.learnhub.backend.config.FirebaseProperties;
+import com.learnhub.backend.modules.instructor.dtos.InstructorOnboardingRequest;
+import com.learnhub.backend.modules.instructor.services.InstructorServices;
 import com.learnhub.backend.modules.user.dtos.FirebaseClientConfig;
 import com.learnhub.backend.modules.user.dtos.GoogleAuthRequest;
 import com.learnhub.backend.modules.user.dtos.LoginReponse;
@@ -39,18 +41,21 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
     private final PasswordEncoder passwordEncoder;
     private final AuthSessionService sessions;
     private final FirebaseProperties firebaseProperties;
+    private final InstructorServices instructorServices;
 
     public UserServices(
             userRepository users,
             userCatalogueRepository catalogues,
             PasswordEncoder passwordEncoder,
             AuthSessionService sessions,
-            FirebaseProperties firebaseProperties) {
+            FirebaseProperties firebaseProperties,
+            InstructorServices instructorServices) {
         this.users = users;
         this.catalogues = catalogues;
         this.passwordEncoder = passwordEncoder;
         this.sessions = sessions;
         this.firebaseProperties = firebaseProperties;
+        this.instructorServices = instructorServices;
     }
 
     @Override
@@ -136,6 +141,10 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
         account.setStatus("ACTIVE");
         account.setEmailVerified(false);
         users.save(account);
+        instructorServices.upsertIfPresent(account, onboardingFrom(
+                request.getTeachingFormat(),
+                request.getRecordingExperience(),
+                request.getAudienceSize()));
         return toAuthResponse(account);
     }
 
@@ -179,6 +188,10 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
             applyRole(account, resolveRole(account));
             account.setLastLoginAt(LocalDateTime.now());
             users.save(account);
+            instructorServices.upsertIfPresent(account, onboardingFrom(
+                    request.getTeachingFormat(),
+                    request.getRecordingExperience(),
+                    request.getAudienceSize()));
             return toAuthResponse(account);
         }
 
@@ -200,6 +213,10 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
         account.setEmailVerified(Boolean.TRUE.equals(decoded.isEmailVerified()));
         account.setLastLoginAt(LocalDateTime.now());
         users.save(account);
+        instructorServices.upsertIfPresent(account, onboardingFrom(
+                request.getTeachingFormat(),
+                request.getRecordingExperience(),
+                request.getAudienceSize()));
         return toAuthResponse(account);
     }
 
@@ -311,6 +328,17 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
             username = base + suffix;
         }
         return username;
+    }
+
+    private InstructorOnboardingRequest onboardingFrom(
+            String teachingFormat,
+            String recordingExperience,
+            String audienceSize) {
+        InstructorOnboardingRequest request = new InstructorOnboardingRequest();
+        request.setTeachingFormat(teachingFormat);
+        request.setRecordingExperience(recordingExperience);
+        request.setAudienceSize(audienceSize);
+        return request;
     }
 
     private String uniquePhone() {

@@ -11,6 +11,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { authRequest, saveAuth, setPendingToast } from "@/lib/auth";
 import { ROLE_LABELS, ROLES } from "@/lib/roles";
 import { hasErrors, validateRegister } from "@/lib/validate";
+import {
+  INSTRUCTOR_STUDIO,
+  clearTeachStart,
+  fromTeachFlow,
+  readTeachStartAnswers,
+} from "@/lib/teachStart";
 
 const Page = () => {
   const [values, setValues] = useState({
@@ -47,16 +53,20 @@ const Page = () => {
     }
     setLoading(true);
     try {
+      const onboarding = readTeachStartAnswers();
+      const teach = fromTeachFlow();
       const data = await authRequest("/api/auth/register", {
         name: values.name.trim(),
         email: values.email.trim(),
         password: values.password,
         confirmPassword: values.confirmPassword,
-        role: values.role,
+        role: teach ? ROLES.INSTRUCTOR : values.role,
+        ...(onboarding || {}),
       });
       saveAuth(data);
+      clearTeachStart();
       setPendingToast("success", "Đăng ký thành công");
-      window.location.href = "/";
+      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : "/";
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -73,7 +83,7 @@ const Page = () => {
       title="Đăng ký"
       description="Tạo tài khoản để bắt đầu học"
       switchText="Đã có tài khoản?"
-      switchHref="/dang-nhap"
+      switchHref={fromTeachFlow() ? "/dang-nhap?from=teach" : "/dang-nhap"}
       switchLabel="Đăng nhập"
     >
       <form noValidate onSubmit={onSubmit} className="mt-6 grid gap-4">
@@ -125,6 +135,7 @@ const Page = () => {
           onBlur={onBlur("confirmPassword")}
           error={errors.confirmPassword}
         />
+        {fromTeachFlow() ? null : (
         <div className="grid gap-2">
           <Label className="text-[14px] font-medium tracking-[0.01em]">
             Vai trò
@@ -151,6 +162,7 @@ const Page = () => {
             <p className="text-[13px] text-destructive">{errors.role}</p>
           ) : null}
         </div>
+        )}
         <div className="grid gap-2">
           <div className="flex items-start gap-2">
             <Checkbox
@@ -211,7 +223,13 @@ const Page = () => {
         </Button>
       </form>
       <SocialAuth
-        role={values.role}
+        role={fromTeachFlow() ? ROLES.INSTRUCTOR : values.role}
+        extraBody={readTeachStartAnswers() || {}}
+        redirectTo={
+          fromTeachFlow() || values.role === ROLES.INSTRUCTOR
+            ? INSTRUCTOR_STUDIO
+            : "/"
+        }
         onBeforeGoogle={() => (agree ? "" : "Vui lòng đồng ý với điều khoản")}
       />
     </AuthLayout>

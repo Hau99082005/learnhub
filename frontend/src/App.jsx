@@ -7,6 +7,7 @@ import Category from "@/components/Category"
 import CategoryPage from "@/category/page"
 import Instructors from "@/components/Instructors"
 import TeachStart from "@/components/TeachStart"
+import InstructorPage from "@/instructor/page"
 import About from "@/components/About"
 import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
@@ -20,6 +21,8 @@ function App() {
   const isLogin = path === "/dang-nhap"
   const isRegister = path === "/dang-ky"
   const isTeachStart = path === "/giang-day/bat-dau"
+  const isInstructorStudio =
+    path === "/giang-day/quan-tri" || path.startsWith("/giang-day/quan-tri/")
   const isAdminPage =
     path === "/quan-tri" ||
     path.startsWith("/quan-tri/") ||
@@ -42,6 +45,15 @@ function App() {
     return (
       <>
         <TeachStart />
+        <Toaster position="top-center" richColors />
+      </>
+    )
+  }
+
+  if (isInstructorStudio) {
+    return (
+      <>
+        <InstructorPage />
         <Toaster position="top-center" richColors />
       </>
     )

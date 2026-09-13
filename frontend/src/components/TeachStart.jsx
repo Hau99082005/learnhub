@@ -1,4 +1,11 @@
 import { useState } from "react";
+import { getAuthUser, authPost, setPendingToast, updateAuthUser } from "@/lib/auth";
+import {
+  TEACH_START_KEY,
+  INSTRUCTOR_STUDIO,
+  readTeachStartAnswers,
+  clearTeachStart,
+} from "@/lib/teachStart";
 import {
   Camera,
   Clapperboard,
@@ -20,9 +27,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-const REGISTER_HREF = "/dang-ky?role=INSTRUCTOR";
+const REGISTER_HREF = "/dang-ky?role=INSTRUCTOR&from=teach";
 const EXIT_HREF = "/giang-day";
-const STORAGE_KEY = "learnhub.teachStart";
+const STORAGE_KEY = TEACH_START_KEY;
 
 const STEPS = [
   {
@@ -143,6 +150,7 @@ const TeachStart = () => {
     Math.min(Math.max(saved.step, 0), STEPS.length - 1),
   );
   const [answers, setAnswers] = useState(saved.answers);
+  const [saving, setSaving] = useState(false);
   const current = STEPS[step];
   const selected = answers[current.id] || "";
   const progress = ((step + 1) / STEPS.length) * 100;
@@ -160,13 +168,36 @@ const TeachStart = () => {
     persist(step, next);
   };
 
+  const finish = async () => {
+    persist(0, answers);
+    if (getAuthUser()) {
+      const payload = readTeachStartAnswers();
+      if (!payload) {
+        window.location.href = REGISTER_HREF;
+        return;
+      }
+      setSaving(true);
+      try {
+        await authPost("/api/instructor/onboarding", payload);
+        updateAuthUser({ role: "INSTRUCTOR" });
+        clearTeachStart();
+        setPendingToast("success", "Đã lưu thông tin giảng dạy");
+        window.location.href = INSTRUCTOR_STUDIO;
+      } catch {
+        setPendingToast("error", "Không lưu được thông tin. Vui lòng đăng nhập lại.");
+        window.location.href = "/dang-nhap?from=teach";
+      }
+      return;
+    }
+    window.location.href = REGISTER_HREF;
+  };
+
   const goNext = () => {
-    if (!selected) {
+    if (!selected || saving) {
       return;
     }
     if (step >= STEPS.length - 1) {
-      persist(0, answers);
-      window.location.href = REGISTER_HREF;
+      finish();
       return;
     }
     const nextStep = step + 1;
@@ -305,7 +336,7 @@ const TeachStart = () => {
           <Button
             type="button"
             onClick={goNext}
-            disabled={!selected}
+            disabled={!selected || saving}
             className="h-11 px-6 text-[15px]"
             style={{
               ...bodyStyle,
@@ -314,7 +345,7 @@ const TeachStart = () => {
               borderRadius: "5px",
             }}
           >
-            Tiếp tục
+            {saving ? "Đang lưu..." : "Tiếp tục"}
           </Button>
         </div>
       </footer>

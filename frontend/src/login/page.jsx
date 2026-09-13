@@ -7,8 +7,14 @@ import SocialAuth from "@/components/auth/SocialAuth";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { authRequest, saveAuth, setPendingToast } from "@/lib/auth";
+import { authPost, authRequest, saveAuth, setPendingToast, updateAuthUser } from "@/lib/auth";
 import { hasErrors, validateLogin } from "@/lib/validate";
+import {
+  INSTRUCTOR_STUDIO,
+  clearTeachStart,
+  fromTeachFlow,
+  readTeachStartAnswers,
+} from "@/lib/teachStart";
 
 const Page = () => {
   const [values, setValues] = useState({
@@ -44,8 +50,14 @@ const Page = () => {
         password: values.password,
       });
       saveAuth(data);
+      const onboarding = readTeachStartAnswers();
+      if (onboarding) {
+        await authPost("/api/instructor/onboarding", onboarding);
+        updateAuthUser({ role: "INSTRUCTOR" });
+        clearTeachStart();
+      }
       setPendingToast("success", "Đăng nhập thành công");
-      window.location.href = "/";
+      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : "/";
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -62,7 +74,7 @@ const Page = () => {
       title="Đăng nhập"
       description="Chào mừng bạn quay lại LearnHub"
       switchText="Chưa có tài khoản?"
-      switchHref="/dang-ky"
+      switchHref={fromTeachFlow() ? "/dang-ky?role=INSTRUCTOR&from=teach" : "/dang-ky"}
       switchLabel="Đăng ký"
     >
       <form noValidate onSubmit={onSubmit} className="mt-6 grid gap-4">
@@ -144,7 +156,10 @@ const Page = () => {
           {loading ? "Đang đăng nhập..." : "Đăng nhập"}
         </Button>
       </form>
-      <SocialAuth />
+      <SocialAuth
+        extraBody={readTeachStartAnswers() || {}}
+        redirectTo={fromTeachFlow() || readTeachStartAnswers() ? INSTRUCTOR_STUDIO : "/"}
+      />
     </AuthLayout>
   );
 };

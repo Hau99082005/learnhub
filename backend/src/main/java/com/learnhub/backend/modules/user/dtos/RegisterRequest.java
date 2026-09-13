@@ -6,6 +6,9 @@ public class RegisterRequest {
     private String password;
     private String confirmPassword;
     private String role;
+    private String teachingFormat;
+    private String recordingExperience;
+    private String audienceSize;
 
     public String getName() {
         return name;
@@ -45,5 +48,29 @@ public class RegisterRequest {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getTeachingFormat() {
+        return teachingFormat;
+    }
+
+    public void setTeachingFormat(String teachingFormat) {
+        this.teachingFormat = teachingFormat;
+    }
+
+    public String getRecordingExperience() {
+        return recordingExperience;
+    }
+
+    public void setRecordingExperience(String recordingExperience) {
+        this.recordingExperience = recordingExperience;
+    }
+
+    public String getAudienceSize() {
+        return audienceSize;
+    }
+
+    public void setAudienceSize(String audienceSize) {
+        this.audienceSize = audienceSize;
     }
 }

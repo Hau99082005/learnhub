@@ -48,6 +48,23 @@ export function getAuthToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
 
+export async function authPost(path, body) {
+  const token = getAuthToken()
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    body: JSON.stringify(body || {}),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+  }
+  return data
+}
+
 export async function authGet(path) {
   const token = getAuthToken()
   const response = await fetch(path, {
@@ -110,6 +127,21 @@ export function getAuthUser() {
   } catch {
     return null
   }
+}
+
+export function updateAuthUser(partial) {
+  const user = getAuthUser()
+  if (!user) {
+    return
+  }
+  localStorage.setItem(
+    USER_KEY,
+    JSON.stringify({
+      ...user,
+      ...partial,
+    }),
+  )
+  notifyAuth()
 }
 
 export function clearAuth() {

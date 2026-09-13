@@ -166,10 +166,49 @@ const AllCategory = () => {
     <section className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Danh mục</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{countLabel}</p>
+          <h1
+            className="text-2xl font-semibold tracking-tight"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "28px",
+              fontWeight: "600",
+              fontStyle: "normal",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+              borderRadius: "5px",
+            }}
+          >
+            Danh mục
+          </h1>
+          <p
+            className="mt-1 text-sm text-muted-foreground"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "14px",
+              fontWeight: "500",
+              fontStyle: "normal",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+              borderRadius: "5px",
+            }}
+          >
+            {countLabel}
+          </p>
         </div>
-        <Button type="button" onClick={openCreate} className="w-full sm:w-auto">
+        <Button
+          type="button"
+          onClick={openCreate}
+          className="w-full sm:w-auto"
+          style={{
+            fontFamily: "'Roboto', sans-serif",
+            fontSize: "14px",
+            fontWeight: "500",
+            fontStyle: "normal",
+            lineHeight: 1.4,
+            letterSpacing: "0.01em",
+            borderRadius: "5px",
+          }}
+        >
           <Plus className="size-4" />
           Thêm danh mục
         </Button>
@@ -201,7 +240,7 @@ const AllCategory = () => {
           {items.map((item) => (
             <article
               key={item.id}
-              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+              className="overflow-hidden rounded-none border border-border bg-card shadow-sm"
             >
               <div className="relative aspect-[16/9] bg-muted">
                 {item.images ? (
@@ -214,18 +253,34 @@ const AllCategory = () => {
                 <Badge
                   variant={item.status ? "default" : "secondary"}
                   className="absolute top-3 left-3"
+                  style={{
+                    fontFamily: "'Roboto', sans-serif",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    fontStyle: "normal",
+                    lineHeight: 1.4,
+                    letterSpacing: "0.01em",
+                    borderRadius: "5px",
+                  }}
                 >
                   {item.status ? "Đang hiện" : "Đã ẩn"}
                 </Badge>
               </div>
               <div className="space-y-3 p-4">
                 <div>
-                  <h2 className="line-clamp-1 text-base font-semibold">
+                  <h2
+                    className="line-clamp-1 text-base font-semibold"
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      fontSize: "16px",
+                      fontWeight: "500",
+                      fontStyle: "normal",
+                      lineHeight: 1.4,
+                      letterSpacing: "0.01em",
+                    }}
+                  >
                     {item.name}
                   </h2>
-                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                    {item.slug}
-                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -233,6 +288,15 @@ const AllCategory = () => {
                     variant="outline"
                     className="flex-1"
                     onClick={() => openEdit(item)}
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      fontStyle: "normal",
+                      lineHeight: 1.4,
+                      letterSpacing: "0.01em",
+                      borderRadius: "5px",
+                    }}
                   >
                     <Pencil className="size-4" />
                     Sửa
@@ -244,6 +308,15 @@ const AllCategory = () => {
                     onClick={() => {
                       setEditing(item);
                       setDeleteOpen(true);
+                    }}
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      fontStyle: "normal",
+                      lineHeight: 1.4,
+                      letterSpacing: "0.01em",
+                      borderRadius: "5px",
                     }}
                   >
                     <Trash2 className="size-4" />

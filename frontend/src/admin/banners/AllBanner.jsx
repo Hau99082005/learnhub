@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
-import { ImagePlus, Pencil, Plus, Trash2, Upload } from "lucide-react"
-import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useEffect, useMemo, useState } from "react";
+import { ImagePlus, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,164 +10,202 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { authDelete, authForm, authGet } from "@/lib/auth"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { authDelete, authForm, authGet } from "@/lib/auth";
 
 const EMPTY = {
   title: "",
   isActive: true,
-}
+};
 
 function bannerSrc(url) {
   if (!url) {
-    return ""
+    return "";
   }
-  return url
+  return url;
 }
 
 function titleFromFile(name) {
-  const base = String(name || "").replace(/\\/g, "/").split("/").pop() || ""
-  const dot = base.lastIndexOf(".")
-  return (dot > 0 ? base.slice(0, dot) : base).trim()
+  const base =
+    String(name || "")
+      .replace(/\\/g, "/")
+      .split("/")
+      .pop() || "";
+  const dot = base.lastIndexOf(".");
+  return (dot > 0 ? base.slice(0, dot) : base).trim();
 }
 
 const AllBanner = () => {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [formOpen, setFormOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState(EMPTY)
-  const [file, setFile] = useState(null)
-  const [preview, setPreview] = useState("")
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(EMPTY);
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState("");
 
   const load = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const data = await authGet("/api/admin/banners")
-      setItems(Array.isArray(data) ? data : [])
+      const data = await authGet("/api/admin/banners");
+      setItems(Array.isArray(data) ? data : []);
     } catch (error) {
-      toast.error(error.message)
+      toast.error(error.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    load()
-  }, [])
+    load();
+  }, []);
 
   useEffect(() => {
     if (!file) {
-      return
+      return;
     }
-    const url = URL.createObjectURL(file)
-    setPreview(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file])
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const openCreate = () => {
-    setEditing(null)
-    setForm(EMPTY)
-    setFile(null)
-    setPreview("")
-    setFormOpen(true)
-  }
+    setEditing(null);
+    setForm(EMPTY);
+    setFile(null);
+    setPreview("");
+    setFormOpen(true);
+  };
 
   const openEdit = (item) => {
-    setEditing(item)
+    setEditing(item);
     setForm({
       title: item.title || "",
       isActive: item.isActive !== false,
-    })
-    setFile(null)
-    setPreview(bannerSrc(item.imageUrl))
-    setFormOpen(true)
-  }
+    });
+    setFile(null);
+    setPreview(bannerSrc(item.imageUrl));
+    setFormOpen(true);
+  };
 
   const onPickFile = (event) => {
-    const next = event.target.files?.[0]
+    const next = event.target.files?.[0];
     if (!next) {
-      return
+      return;
     }
     if (!next.type.startsWith("image/")) {
-      toast.error("Vui lòng chọn file ảnh")
-      return
+      toast.error("Vui lòng chọn file ảnh");
+      return;
     }
-    setFile(next)
-    setForm((prev) => ({ ...prev, title: titleFromFile(next.name) }))
-  }
+    setFile(next);
+    setForm((prev) => ({ ...prev, title: titleFromFile(next.name) }));
+  };
 
   const onSubmit = async (event) => {
-    event.preventDefault()
+    event.preventDefault();
     if (!editing && !file) {
-      toast.error("Vui lòng tải ảnh banner lên")
-      return
+      toast.error("Vui lòng tải ảnh banner lên");
+      return;
     }
-    const title = form.title.trim() || (file ? titleFromFile(file.name) : "")
+    const title = form.title.trim() || (file ? titleFromFile(file.name) : "");
     if (!title) {
-      toast.error("Vui lòng tải ảnh banner lên")
-      return
+      toast.error("Vui lòng tải ảnh banner lên");
+      return;
     }
-    const payload = new FormData()
-    payload.append("title", title)
-    payload.append("isActive", String(form.isActive))
+    const payload = new FormData();
+    payload.append("title", title);
+    payload.append("isActive", String(form.isActive));
     if (file) {
-      payload.append("image", file)
+      payload.append("image", file);
     }
-    setSaving(true)
+    setSaving(true);
     try {
       if (editing) {
-        await authForm(`/api/admin/banners/${editing.id}`, payload, "PUT")
-        toast.success("Đã cập nhật banner")
+        await authForm(`/api/admin/banners/${editing.id}`, payload, "PUT");
+        toast.success("Đã cập nhật banner");
       } else {
-        await authForm("/api/admin/banners", payload, "POST")
-        toast.success("Đã thêm banner")
+        await authForm("/api/admin/banners", payload, "POST");
+        toast.success("Đã thêm banner");
       }
-      setFormOpen(false)
-      await load()
+      setFormOpen(false);
+      await load();
     } catch (error) {
-      toast.error(error.message)
+      toast.error(error.message);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const onDelete = async () => {
     if (!editing) {
-      return
+      return;
     }
-    setSaving(true)
+    setSaving(true);
     try {
-      await authDelete(`/api/admin/banners/${editing.id}`)
-      toast.success("Đã xóa banner")
-      setDeleteOpen(false)
-      setEditing(null)
-      await load()
+      await authDelete(`/api/admin/banners/${editing.id}`);
+      toast.success("Đã xóa banner");
+      setDeleteOpen(false);
+      setEditing(null);
+      await load();
     } catch (error) {
-      toast.error(error.message)
+      toast.error(error.message);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
-  const countLabel = useMemo(
-    () => `${items.length} banner`,
-    [items.length],
-  )
+  const countLabel = useMemo(() => `${items.length} banner`, [items.length]);
 
   return (
     <section className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Banners</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{countLabel}</p>
+          <h1
+            className="text-2xl font-semibold tracking-tight"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "28px",
+              fontWeight: "600",
+              fontStyle: "normal",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+            }}
+          >
+            Banners
+          </h1>
+          <p
+            className="mt-1 text-sm text-muted-foreground"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "14px",
+              fontWeight: "500",
+              fontStyle: "normal",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+            }}
+          >
+            {countLabel}
+          </p>
         </div>
-        <Button type="button" onClick={openCreate} className="w-full sm:w-auto">
+        <Button
+          type="button"
+          onClick={openCreate}
+          className="w-full sm:w-auto"
+          style={{
+            fontFamily: "'Roboto', sans-serif",
+            fontSize: "14px",
+            fontWeight: "500",
+            fontStyle: "normal",
+            lineHeight: 1.4,
+            letterSpacing: "0.01em",
+            borderRadius: "5px",
+          }}
+        >
           <Plus className="size-4" />
           Thêm banner
         </Button>
@@ -176,7 +214,10 @@ const AllBanner = () => {
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-64 animate-pulse rounded-2xl bg-muted" />
+            <div
+              key={index}
+              className="h-64 animate-pulse rounded-2xl bg-muted"
+            />
           ))}
         </div>
       ) : items.length === 0 ? (
@@ -196,7 +237,7 @@ const AllBanner = () => {
           {items.map((item) => (
             <article
               key={item.id}
-              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+              className="overflow-hidden rounded-none border border-border bg-card shadow-sm"
             >
               <div className="relative aspect-[16/9] bg-muted">
                 {item.imageUrl ? (
@@ -209,18 +250,48 @@ const AllBanner = () => {
                 <Badge
                   variant={item.isActive ? "default" : "secondary"}
                   className="absolute top-3 left-3"
+                  style={{
+                    fontFamily: "'Roboto', sans-serif",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    fontStyle: "normal",
+                    lineHeight: 1.4,
+                    letterSpacing: "0.01em",
+                    borderRadius: "5px",
+                  }}
                 >
                   {item.isActive ? "Đang hiện" : "Đã ẩn"}
                 </Badge>
               </div>
               <div className="space-y-3 p-4">
-                <h2 className="line-clamp-1 text-base font-semibold">{item.title}</h2>
+                <h2
+                  className="line-clamp-1 text-base font-semibold"
+                  style={{
+                    fontFamily: "'Roboto', sans-serif",
+                    fontSize: "16px",
+                    fontWeight: "500",
+                    fontStyle: "normal",
+                    lineHeight: 1.4,
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  {item.title}
+                </h2>
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     className="flex-1"
                     onClick={() => openEdit(item)}
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      fontStyle: "normal",
+                      lineHeight: 1.4,
+                      letterSpacing: "0.01em",
+                      borderRadius: "5px",
+                    }}
                   >
                     <Pencil className="size-4" />
                     Sửa
@@ -230,8 +301,17 @@ const AllBanner = () => {
                     variant="destructive"
                     className="flex-1"
                     onClick={() => {
-                      setEditing(item)
-                      setDeleteOpen(true)
+                      setEditing(item);
+                      setDeleteOpen(true);
+                    }}
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      fontStyle: "normal",
+                      lineHeight: 1.4,
+                      letterSpacing: "0.01em",
+                      borderRadius: "5px",
                     }}
                   >
                     <Trash2 className="size-4" />
@@ -249,7 +329,9 @@ const AllBanner = () => {
           <DialogHeader>
             <DialogTitle>{editing ? "Sửa banner" : "Thêm banner"}</DialogTitle>
             <DialogDescription>
-              {editing ? "Cập nhật ảnh banner" : "Tải ảnh lên để tạo banner mới"}
+              {editing
+                ? "Cập nhật ảnh banner"
+                : "Tải ảnh lên để tạo banner mới"}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSubmit} className="grid gap-4">
@@ -257,11 +339,17 @@ const AllBanner = () => {
               <span className="text-sm font-medium">Ảnh banner</span>
               <div className="overflow-hidden rounded-xl border border-dashed border-border bg-muted/40">
                 {preview ? (
-                  <img src={preview} alt="" className="aspect-[16/9] w-full object-cover" />
+                  <img
+                    src={preview}
+                    alt=""
+                    className="aspect-[16/9] w-full object-cover"
+                  />
                 ) : (
                   <div className="flex aspect-[16/9] flex-col items-center justify-center gap-2 text-muted-foreground">
                     <Upload className="size-7" />
-                    <span className="text-sm">Chọn ảnh JPG, PNG, WEBP hoặc GIF</span>
+                    <span className="text-sm">
+                      Chọn ảnh JPG, PNG, WEBP hoặc GIF
+                    </span>
                   </div>
                 )}
               </div>
@@ -283,11 +371,17 @@ const AllBanner = () => {
               <Switch
                 id="banner-active"
                 checked={form.isActive}
-                onCheckedChange={(value) => setForm((prev) => ({ ...prev, isActive: value === true }))}
+                onCheckedChange={(value) =>
+                  setForm((prev) => ({ ...prev, isActive: value === true }))
+                }
               />
             </div>
             <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0">
-              <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFormOpen(false)}
+              >
                 Hủy
               </Button>
               <Button type="submit" disabled={saving}>
@@ -307,18 +401,27 @@ const AllBanner = () => {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+            >
               Hủy
             </Button>
-            <Button type="button" variant="destructive" disabled={saving} onClick={onDelete}>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={saving}
+              onClick={onDelete}
+            >
               {saving ? "Đang xóa..." : "Xóa"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </section>
-  )
-}
+  );
+};
 
-export { AllBanner }
-export default AllBanner
+export { AllBanner };
+export default AllBanner;

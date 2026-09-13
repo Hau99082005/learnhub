@@ -9,6 +9,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.FirebaseToken;
+import com.learnhub.backend.config.FirebaseProperties;
+import com.learnhub.backend.modules.user.dtos.FirebaseClientConfig;
+import com.learnhub.backend.modules.user.dtos.GoogleAuthRequest;
 import com.learnhub.backend.modules.user.dtos.LoginReponse;
 import com.learnhub.backend.modules.user.dtos.LoginRequest;
 import com.learnhub.backend.modules.user.dtos.RegisterRequest;
@@ -31,16 +38,19 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
     private final userCatalogueRepository catalogues;
     private final PasswordEncoder passwordEncoder;
     private final AuthSessionService sessions;
+    private final FirebaseProperties firebaseProperties;
 
     public UserServices(
             userRepository users,
             userCatalogueRepository catalogues,
             PasswordEncoder passwordEncoder,
-            AuthSessionService sessions) {
+            AuthSessionService sessions,
+            FirebaseProperties firebaseProperties) {
         this.users = users;
         this.catalogues = catalogues;
         this.passwordEncoder = passwordEncoder;
         this.sessions = sessions;
+        this.firebaseProperties = firebaseProperties;
     }
 
     @Override
@@ -127,6 +137,83 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
         account.setEmailVerified(false);
         users.save(account);
         return toAuthResponse(account);
+    }
+
+    @Override
+    @Transactional
+    public LoginReponse loginWithGoogle(GoogleAuthRequest request) {
+        if (request == null || request.getIdToken() == null || request.getIdToken().isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Đăng nhập Google không hợp lệ");
+        }
+        if (FirebaseApp.getApps().isEmpty()) {
+            throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Chưa cấu hình Firebase");
+        }
+        FirebaseToken decoded;
+        try {
+            decoded = FirebaseAuth.getInstance().verifyIdToken(request.getIdToken().trim());
+        } catch (FirebaseAuthException exception) {
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "Đăng nhập Google không hợp lệ");
+        }
+        String uid = decoded.getUid();
+        String email = normalizeEmail(decoded.getEmail());
+        if (email == null || email.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Tài khoản Google không có email");
+        }
+        String name = decoded.getName() == null ? "" : decoded.getName().trim();
+        if (name.isBlank()) {
+            name = email.split("@")[0];
+        }
+
+        user account = users.findByFirebaseUid(uid).or(() -> users.findByEmail(email)).orElse(null);
+        if (account != null) {
+            if (account.getDeletedAt() != null || !"ACTIVE".equalsIgnoreCase(account.getStatus())) {
+                throw new AuthException(HttpStatus.UNAUTHORIZED, "Tài khoản không khả dụng");
+            }
+            account.setFirebaseUid(uid);
+            if (account.getFullName() == null || account.getFullName().isBlank()) {
+                account.setFullName(name);
+            }
+            if (Boolean.TRUE.equals(decoded.isEmailVerified())) {
+                account.setEmailVerified(true);
+            }
+            applyRole(account, resolveRole(account));
+            account.setLastLoginAt(LocalDateTime.now());
+            users.save(account);
+            return toAuthResponse(account);
+        }
+
+        UserRole role = UserRole.fromPublic(request.getRole());
+        userCatalogue catalogue = requireCatalogue(role);
+        account = new user();
+        account.setFirebaseUid(uid);
+        account.setUserCatalogue(catalogue);
+        account.setRole(role.name());
+        account.setUsername(uniqueUsername(email));
+        account.setEmail(email);
+        account.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        account.setPhone(uniquePhone());
+        account.setAddress("Chưa cập nhật");
+        account.setBio("");
+        account.setImages("google-" + uid + ".png");
+        account.setFullName(name);
+        account.setStatus("ACTIVE");
+        account.setEmailVerified(Boolean.TRUE.equals(decoded.isEmailVerified()));
+        account.setLastLoginAt(LocalDateTime.now());
+        users.save(account);
+        return toAuthResponse(account);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FirebaseClientConfig firebaseClientConfig() {
+        return new FirebaseClientConfig(
+                firebaseProperties.getApiKey(),
+                firebaseProperties.getAuthDomain(),
+                firebaseProperties.getProjectId(),
+                firebaseProperties.getStorageBucket(),
+                firebaseProperties.getMessagingSenderId(),
+                firebaseProperties.getAppId(),
+                firebaseProperties.getMeasurementId());
     }
 
     @Override

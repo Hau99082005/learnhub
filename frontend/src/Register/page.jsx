@@ -207,7 +207,10 @@ const Page = () => {
           {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
         </Button>
       </form>
-      <SocialAuth />
+      <SocialAuth
+        role={values.role}
+        onBeforeGoogle={() => (agree ? "" : "Vui lòng đồng ý với điều khoản")}
+      />
     </AuthLayout>
   );
 };

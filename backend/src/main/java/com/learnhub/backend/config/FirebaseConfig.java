@@ -30,11 +30,15 @@ public class FirebaseConfig {
 		if (credentialsPath == null || credentialsPath.isBlank() || !FirebaseApp.getApps().isEmpty()) {
 			return;
 		}
-		if (!Files.exists(Path.of(credentialsPath))) {
+		Path path = Path.of(credentialsPath);
+		if (!path.isAbsolute()) {
+			path = Path.of(System.getProperty("user.dir")).resolve(path).normalize();
+		}
+		if (!Files.exists(path)) {
 			return;
 		}
 
-		try (FileInputStream serviceAccount = new FileInputStream(credentialsPath)) {
+		try (FileInputStream serviceAccount = new FileInputStream(path.toFile())) {
 			FirebaseOptions.Builder builder = FirebaseOptions.builder()
 					.setCredentials(GoogleCredentials.fromStream(serviceAccount));
 			if (firebaseProperties.getProjectId() != null && !firebaseProperties.getProjectId().isBlank()) {

@@ -9,6 +9,8 @@ import com.learnhub.backend.modules.user.models.user;
 public interface userRepository extends JpaRepository<user, Long> {
     Optional<user> findByEmail(String email);
 
+    Optional<user> findByFirebaseUid(String firebaseUid);
+
     boolean existsByEmail(String email);
 
     boolean existsByUsername(String username);

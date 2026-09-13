@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.learnhub.backend.modules.user.dtos.FirebaseClientConfig;
+import com.learnhub.backend.modules.user.dtos.GoogleAuthRequest;
 import com.learnhub.backend.modules.user.dtos.LoginReponse;
 import com.learnhub.backend.modules.user.dtos.LoginRequest;
 import com.learnhub.backend.modules.user.dtos.RegisterRequest;
@@ -31,6 +33,16 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<LoginReponse> register(@RequestBody RegisterRequest request) {
         return ResponseEntity.ok(userServices.register(request));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<LoginReponse> google(@RequestBody GoogleAuthRequest request) {
+        return ResponseEntity.ok(userServices.loginWithGoogle(request));
+    }
+
+    @GetMapping("/firebase-config")
+    public ResponseEntity<FirebaseClientConfig> firebaseConfig() {
+        return ResponseEntity.ok(userServices.firebaseClientConfig());
     }
 
     @GetMapping("/me")

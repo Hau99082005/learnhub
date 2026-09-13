@@ -18,7 +18,7 @@ const EXPLORE = [
 const COMPANY = [
   { href: "/gioi-thieu", label: "Giới thiệu" },
   { href: "/tin-tuc", label: "Tin tức" },
-  { href: "/giang-vien", label: "Giảng viên" },
+  { href: "/giang-day", label: "Giảng dạy" },
   { href: "/lien-he", label: "Liên hệ" },
 ];
 

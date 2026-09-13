@@ -18,7 +18,10 @@ const Page = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    role: ROLES.USER,
+    role:
+      new URLSearchParams(window.location.search).get("role") === ROLES.INSTRUCTOR
+        ? ROLES.INSTRUCTOR
+        : ROLES.USER,
   });
   const [agree, setAgree] = useState(false);
   const [errors, setErrors] = useState({});

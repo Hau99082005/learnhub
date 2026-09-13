@@ -6,6 +6,7 @@ import Banner from "@/components/Banner"
 import Category from "@/components/Category"
 import CategoryPage from "@/category/page"
 import Instructors from "@/components/Instructors"
+import TeachStart from "@/components/TeachStart"
 import About from "@/components/About"
 import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
@@ -18,6 +19,7 @@ function App() {
   const path = window.location.pathname
   const isLogin = path === "/dang-nhap"
   const isRegister = path === "/dang-ky"
+  const isTeachStart = path === "/giang-day/bat-dau"
   const isAdminPage =
     path === "/quan-tri" ||
     path.startsWith("/quan-tri/") ||
@@ -35,6 +37,15 @@ function App() {
     }
     toast.success(pending.message)
   }, [])
+
+  if (isTeachStart) {
+    return (
+      <>
+        <TeachStart />
+        <Toaster position="top-center" richColors />
+      </>
+    )
+  }
 
   if (isAdminPage) {
     return (

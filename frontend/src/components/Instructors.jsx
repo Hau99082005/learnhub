@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const START_HREF = "/dang-ky?role=INSTRUCTOR";
+const START_HREF = "/giang-day/bat-dau";
 
 const REASONS = [
   {

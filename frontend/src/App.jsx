@@ -6,6 +6,7 @@ import Banner from "@/components/Banner"
 import Category from "@/components/Category"
 import CategoryPage from "@/category/page"
 import Instructors from "@/components/Instructors"
+import About from "@/components/About"
 import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
 import { Toaster } from "@/components/ui/sonner"
@@ -60,6 +61,8 @@ function App() {
               <Banner />
               <Category />
             </>
+          ) : path === "/gioi-thieu" ? (
+            <About />
           ) : path === "/giang-day" ? (
             <Instructors />
           ) : path.startsWith("/danh-muc/") && path.split("/").filter(Boolean)[1] ? (

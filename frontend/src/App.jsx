@@ -3,6 +3,8 @@ import { toast } from "sonner"
 import Header from "@/components/Layout/Header"
 import Footer from "@/components/Layout/footer"
 import Banner from "@/components/Banner"
+import Category from "@/components/Category"
+import CategoryPage from "@/category/page"
 import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
 import { Toaster } from "@/components/ui/sonner"
@@ -51,7 +53,16 @@ function App() {
       ) : isRegister ? (
         <RegisterPage />
       ) : (
-        <main className="flex-1">{path === "/" ? <Banner /> : null}</main>
+        <main className="flex-1">
+          {path === "/" ? (
+            <>
+              <Banner />
+              <Category />
+            </>
+          ) : path.startsWith("/danh-muc/") && path.split("/").filter(Boolean)[1] ? (
+            <CategoryPage slug={decodeURIComponent(path.split("/").filter(Boolean)[1])} />
+          ) : null}
+        </main>
       )}
       <Footer />
       <Toaster position="top-center" richColors />

@@ -1,0 +1,299 @@
+import { useEffect, useMemo, useState } from "react";
+import { ImagePlus, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { authDelete, authForm, authGet } from "@/lib/auth";
+
+const EMPTY = {
+  title: "",
+  isActive: true,
+};
+
+function titleFromFile(name) {
+  const base =
+    String(name || "")
+      .replace(/\\/g, "/")
+      .split("/")
+      .pop() || "";
+  const dot = base.lastIndexOf(".");
+  return (dot > 0 ? base.slice(0, dot) : base).trim();
+}
+
+const AllNews = () => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(EMPTY);
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await authGet("/api/admin/news");
+      setItems(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (!file) {
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY);
+    setFile(null);
+    setPreview("");
+    setFormOpen(true);
+  };
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setForm({
+      title: item.title || "",
+      isActive: item.isActive !== false,
+    });
+    setFile(null);
+    setPreview(item.imageUrl || "");
+    setFormOpen(true);
+  };
+
+  const onPickFile = (event) => {
+    const next = event.target.files?.[0];
+    if (!next) {
+      return;
+    }
+    if (!next.type.startsWith("image/")) {
+      toast.error("Vui lòng chọn file ảnh");
+      return;
+    }
+    setFile(next);
+    setForm((prev) => ({ ...prev, title: titleFromFile(next.name) }));
+  };
+
+  const onSubmit = async (event) => {
+    event.preventDefault();
+    if (!editing && !file) {
+      toast.error("Vui lòng tải ảnh lên");
+      return;
+    }
+    const title = form.title.trim() || (file ? titleFromFile(file.name) : "");
+    if (!title) {
+      toast.error("Vui lòng tải ảnh lên");
+      return;
+    }
+    const payload = new FormData();
+    payload.append("title", title);
+    payload.append("isActive", String(form.isActive));
+    if (file) {
+      payload.append("image", file);
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        await authForm(`/api/admin/news/${editing.id}`, payload, "PUT");
+        toast.success("Đã cập nhật tin nổi bật");
+      } else {
+        await authForm("/api/admin/news", payload, "POST");
+        toast.success("Đã thêm tin nổi bật");
+      }
+      setFormOpen(false);
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onDelete = async () => {
+    if (!editing) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await authDelete(`/api/admin/news/${editing.id}`);
+      toast.success("Đã xóa tin nổi bật");
+      setDeleteOpen(false);
+      setEditing(null);
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const countLabel = useMemo(() => `${items.length} tin nổi bật`, [items.length]);
+
+  return (
+    <section className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Tin nổi bật</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{countLabel}</p>
+        </div>
+        <Button type="button" onClick={openCreate} className="w-full sm:w-auto">
+          <Plus className="size-4" />
+          Thêm tin nổi bật
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-64 animate-pulse rounded-2xl bg-muted" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 text-center">
+          <ImagePlus className="mb-3 size-10 text-muted-foreground" />
+          <p className="font-medium">Chưa có tin nổi bật</p>
+          <p className="mt-1 text-sm text-muted-foreground">Tải ảnh lên để hiện trên trang tin tức</p>
+          <Button type="button" className="mt-4" onClick={openCreate}>
+            <Plus className="size-4" />
+            Thêm tin nổi bật
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <article key={item.id} className="overflow-hidden border border-border bg-card shadow-sm">
+              <div className="relative aspect-[16/9] bg-muted">
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt={item.title} className="size-full object-cover" />
+                ) : null}
+                <Badge variant={item.isActive ? "default" : "secondary"} className="absolute top-3 left-3">
+                  {item.isActive ? "Đang hiện" : "Đã ẩn"}
+                </Badge>
+              </div>
+              <div className="space-y-3 p-4">
+                <h2 className="line-clamp-1 text-base font-semibold">{item.title}</h2>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => openEdit(item)}>
+                    <Pencil className="size-4" />
+                    Sửa
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => {
+                      setEditing(item);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                    Xóa
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Sửa tin nổi bật" : "Thêm tin nổi bật"}</DialogTitle>
+            <DialogDescription>
+              {editing ? "Cập nhật ảnh tin nổi bật" : "Tải ảnh lên để tạo tin nổi bật"}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onSubmit} className="grid gap-4">
+            <label className="grid cursor-pointer gap-2">
+              <span className="text-sm font-medium">Ảnh</span>
+              <div className="overflow-hidden rounded-xl border border-dashed border-border bg-muted/40">
+                {preview ? (
+                  <img src={preview} alt="" className="aspect-[16/9] w-full object-cover" />
+                ) : (
+                  <div className="flex aspect-[16/9] flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Upload className="size-7" />
+                    <span className="text-sm">Chọn ảnh JPG, PNG, WEBP hoặc GIF</span>
+                  </div>
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={onPickFile}
+              />
+            </label>
+            {form.title ? (
+              <div className="grid gap-2">
+                <Label htmlFor="news-title">Tên ảnh</Label>
+                <Input id="news-title" value={form.title} readOnly />
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+              <Label htmlFor="news-active">Hiển thị</Label>
+              <Switch
+                id="news-active"
+                checked={form.isActive}
+                onCheckedChange={(value) => setForm((prev) => ({ ...prev, isActive: value === true }))}
+              />
+            </div>
+            <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0">
+              <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                Hủy
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Đang lưu..." : editing ? "Cập nhật" : "Tạo tin"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xóa tin nổi bật</DialogTitle>
+            <DialogDescription>Xóa “{editing?.title}”? Thao tác này không hoàn tác được.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+              Hủy
+            </Button>
+            <Button type="button" variant="destructive" disabled={saving} onClick={onDelete}>
+              {saving ? "Đang xóa..." : "Xóa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+};
+
+export { AllNews };
+export default AllNews;

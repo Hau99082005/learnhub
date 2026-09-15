@@ -22,6 +22,8 @@ import { isAdmin } from "@/lib/roles";
 import AdminLayout from "@/admin/layout";
 import { AllBanner } from "@/admin/banners/AllBanner";
 import { AllCategory } from "@/admin/categories/AllCategory";
+import { AllNews } from "@/admin/news/AllNews";
+import { AllNewsBlog } from "@/admin/news/AllNewsBlog";
 
 const STATS = [
   {
@@ -206,10 +208,22 @@ const Page = () => {
   const path = window.location.pathname;
   const isBanners = path === "/admin/banners" || path === "/quan-tri/banners";
   const isCategories = path === "/admin/categories" || path === "/quan-tri/categories";
+  const isNews = path === "/admin/news" || path === "/quan-tri/news";
+  const isNewsBlogs = path === "/admin/newsblogs" || path === "/quan-tri/newsblogs";
 
   return (
     <AdminLayout user={admin}>
-      {isBanners ? <AllBanner /> : isCategories ? <AllCategory /> : <DashboardView />}
+      {isBanners ? (
+        <AllBanner />
+      ) : isCategories ? (
+        <AllCategory />
+      ) : isNews ? (
+        <AllNews />
+      ) : isNewsBlogs ? (
+        <AllNewsBlog />
+      ) : (
+        <DashboardView />
+      )}
     </AdminLayout>
   );
 };

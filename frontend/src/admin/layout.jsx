@@ -20,6 +20,7 @@ import {
   PanelsTopLeft,
   Images,
   Tags,
+  Newspaper,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -54,6 +55,8 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/banners", label: "Banners", icon: Images },
       { href: "/admin/categories", label: "Danh mục", icon: Tags },
+      { href: "/admin/news", label: "Tin nổi bật", icon: Newspaper },
+      { href: "/admin/newsblogs", label: "Bài viết", icon: FileText },
       {
         href: "/quan-tri/thanh-phan",
         label: "Components",

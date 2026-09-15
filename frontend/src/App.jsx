@@ -9,6 +9,7 @@ import Instructors from "@/components/Instructors"
 import TeachStart from "@/components/TeachStart"
 import InstructorPage from "@/instructor/page"
 import About from "@/components/About"
+import NewsPage from "@/news/page"
 import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
 import { Toaster } from "@/components/ui/sonner"
@@ -86,6 +87,8 @@ function App() {
             </>
           ) : path === "/gioi-thieu" ? (
             <About />
+          ) : path === "/tin-tuc" || path.startsWith("/tin-tuc/") ? (
+            <NewsPage />
           ) : path === "/giang-day" ? (
             <Instructors />
           ) : path.startsWith("/danh-muc/") && path.split("/").filter(Boolean)[1] ? (

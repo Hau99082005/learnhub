@@ -41,7 +41,6 @@ const NAV_ITEMS = [
   { href: "/gioi-thieu", label: "Giới thiệu" },
   { href: "/khoa-hoc", label: "Các khóa học" },
   { href: "/tai-lieu", label: "Tài liệu" },
-  { href: "/bai-viet", label: "Bài viết" },
   { href: "/thu-vien", label: "Thư viện" },
   { href: "/tin-tuc", label: "Tin tức" },
 ];

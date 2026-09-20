@@ -24,6 +24,7 @@ import { AllBanner } from "@/admin/banners/AllBanner";
 import { AllCategory } from "@/admin/categories/AllCategory";
 import { AllNews } from "@/admin/news/AllNews";
 import { AllNewsBlog } from "@/admin/news/AllNewsBlog";
+import { AllCourse } from "@/admin/courses/AllCourse";
 
 const STATS = [
   {
@@ -210,6 +211,7 @@ const Page = () => {
   const isCategories = path === "/admin/categories" || path === "/quan-tri/categories";
   const isNews = path === "/admin/news" || path === "/quan-tri/news";
   const isNewsBlogs = path === "/admin/newsblogs" || path === "/quan-tri/newsblogs";
+  const isCourses = path === "/admin/courses" || path === "/quan-tri/courses";
 
   return (
     <AdminLayout user={admin}>
@@ -221,6 +223,8 @@ const Page = () => {
         <AllNews />
       ) : isNewsBlogs ? (
         <AllNewsBlog />
+      ) : isCourses ? (
+        <AllCourse />
       ) : (
         <DashboardView />
       )}

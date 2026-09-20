@@ -38,13 +38,4 @@ public class BaseController {
             throw new RuntimeException("Lỗi lấy dữ liệu users: " + e.getMessage());
         }
     }
-
-    @GetMapping("/courses")
-    public List<Map<String, Object>> getCourses() {
-        try {
-            return jdbcTemplate.queryForList("SELECT * FROM courses");
-        } catch (DataAccessException e) {
-            throw new RuntimeException("Lỗi lấy dữ liệu courses: " + e.getMessage());
-        }
-    }
 }

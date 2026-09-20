@@ -57,6 +57,7 @@ const NAV_GROUPS = [
       { href: "/admin/categories", label: "Danh mục", icon: Tags },
       { href: "/admin/news", label: "Tin nổi bật", icon: Newspaper },
       { href: "/admin/newsblogs", label: "Bài viết", icon: FileText },
+      { href: "/admin/courses", label: "Khóa học", icon: GraduationCap },
       {
         href: "/quan-tri/thanh-phan",
         label: "Components",

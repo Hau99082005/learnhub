@@ -1,5 +1,6 @@
 package com.learnhub.backend.modules.instructor.services;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
@@ -12,6 +13,7 @@ import com.learnhub.backend.modules.instructor.dtos.CourseRequest;
 import com.learnhub.backend.modules.instructor.dtos.InstructorOnboardingDTO;
 import com.learnhub.backend.modules.instructor.dtos.InstructorOnboardingRequest;
 import com.learnhub.backend.modules.instructor.dtos.InstructorStudioDTO;
+import com.learnhub.backend.modules.course.support.SlugUtils;
 import com.learnhub.backend.modules.instructor.models.Course;
 import com.learnhub.backend.modules.instructor.models.InstructorOnboarding;
 import com.learnhub.backend.modules.instructor.repositories.CourseRepository;
@@ -135,9 +137,25 @@ public class InstructorServices {
         Course course = new Course();
         course.setInstructor(account);
         course.setTitle(title);
+        course.setSlug(uniqueSlug(SlugUtils.slugify(title, "khoa-hoc")));
         course.setStatus("DRAFT");
+        course.setLanguage("vi");
+        course.setLevel("ALL");
+        course.setCurrency("VND");
+        course.setIsFree(true);
+        course.setPrice(BigDecimal.ZERO);
         courses.save(course);
         return toCourseDto(course);
+    }
+
+    private String uniqueSlug(String base) {
+        String slug = base;
+        int index = 2;
+        while (courses.existsBySlug(slug)) {
+            slug = base + "-" + index;
+            index += 1;
+        }
+        return slug;
     }
 
     private user requireInstructor(String authorization) {

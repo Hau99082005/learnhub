@@ -76,7 +76,7 @@ function PreviewPlayer({ item }) {
     <button
       id="course-preview-video"
       type="button"
-      className="group relative block aspect-video w-full overflow-hidden bg-muted"
+      className="group relative block aspect-video w-full overflow-hidden bg-black"
       onClick={() => {
         if (hasVideo) {
           setPlaying(true);
@@ -321,7 +321,18 @@ function CourseDetailView({ slug }) {
     <section className="w-full bg-background">
       <div className="mx-auto grid max-w-7xl grid-cols-1 lg:grid-cols-[minmax(0,1fr)_21.5rem] lg:gap-10">
         <div className="relative order-1 min-w-0 text-white">
-          <div className="absolute inset-0 left-1/2 w-screen -translate-x-1/2 bg-[#1c1d1f]" />
+          <div className="absolute inset-0 left-1/2 w-screen -translate-x-1/2 overflow-hidden">
+            {item.images ? (
+              <img
+                src={item.images}
+                alt=""
+                className="absolute inset-0 size-full scale-110 object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-zinc-950" />
+            )}
+            <div className="absolute inset-0 bg-black/45 bg-gradient-to-r from-black/75 via-black/55 to-black/35" />
+          </div>
           <div className="relative px-3 py-6 sm:px-6 sm:py-8 lg:py-10">
             <nav className="flex flex-wrap items-center gap-1.5 text-sm text-violet-300">
               <a
@@ -874,7 +885,7 @@ function CourseDetailView({ slug }) {
 function CourseDetailFallback() {
   return (
     <section className="w-full">
-      <div className="h-64 animate-pulse bg-[#1c1d1f] sm:h-80" />
+      <div className="h-64 animate-pulse bg-zinc-900 sm:h-80" />
     </section>
   );
 }

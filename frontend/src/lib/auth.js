@@ -79,6 +79,23 @@ export async function authGet(path) {
   return data
 }
 
+export async function authPut(path, body) {
+  const token = getAuthToken()
+  const response = await fetch(path, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    body: JSON.stringify(body || {}),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+  }
+  return data
+}
+
 export async function authDelete(path) {
   const token = getAuthToken()
   const response = await fetch(path, {

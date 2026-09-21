@@ -33,6 +33,7 @@ public class CourseAdminDTO {
     private final LocalDateTime publishedAt;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
+    private List<CourseSectionDTO> sections = List.of();
 
     public CourseAdminDTO(
             Long id,
@@ -203,5 +204,13 @@ public class CourseAdminDTO {
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public List<CourseSectionDTO> getSections() {
+        return sections == null ? List.of() : sections;
+    }
+
+    public void setSections(List<CourseSectionDTO> sections) {
+        this.sections = sections == null ? List.of() : sections;
     }
 }

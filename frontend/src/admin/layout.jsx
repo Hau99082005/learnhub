@@ -261,7 +261,10 @@ function Sidebar({ path }) {
             <ul className="grid gap-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = path === item.href;
+                const active =
+                  path === item.href ||
+                  (item.href === "/admin/courses" &&
+                    /^\/(?:admin|quan-tri)\/courses(\/|$)/.test(path));
                 return (
                   <li key={item.href}>
                     <a

@@ -4,6 +4,7 @@ import {
   BookOpen,
   Calendar,
   Check,
+  ChevronDown,
   Clock,
   Globe,
   Heart,
@@ -25,6 +26,212 @@ import {
 import { cn } from "@/lib/utils";
 
 const LANG = { vi: "Tiếng Việt", en: "English" };
+
+const courseCache = new Map();
+
+function getCourse(slug) {
+  if (!courseCache.has(slug)) {
+    courseCache.set(
+      slug,
+      fetch(`/api/courses/${encodeURIComponent(slug)}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .catch(() => null),
+    );
+  }
+  return courseCache.get(slug);
+}
+
+function formatCurriculumLength(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours > 0 && minutes > 0) {
+    return `${hours} giờ ${minutes} phút`;
+  }
+  if (hours > 0) {
+    return `${hours} giờ`;
+  }
+  if (minutes > 0) {
+    return `${minutes} phút`;
+  }
+  if (total > 0) {
+    return `${total} giây`;
+  }
+  return "";
+}
+
+function formatClock(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const rest = total % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function Curriculum({ item }) {
+  const sections = Array.isArray(item.sections) ? item.sections : [];
+  const [openIds, setOpenIds] = useState(() =>
+    sections.slice(0, 1).map((section) => section.id),
+  );
+  const [playingId, setPlayingId] = useState(null);
+
+  const lessonTotal = sections.reduce(
+    (sum, section) => sum + (section.lessonCount || section.lessons?.length || 0),
+    0,
+  );
+  const durationTotal = sections.reduce(
+    (sum, section) => sum + (Number(section.durationSeconds) || 0),
+    0,
+  );
+  const allOpen = sections.length > 0 && openIds.length === sections.length;
+
+  const toggle = (id) => {
+    setOpenIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id],
+    );
+  };
+
+  const toggleAll = () => {
+    setOpenIds(allOpen ? [] : sections.map((section) => section.id));
+  };
+
+  if (!sections.length) {
+    if (!item.previewVideo) {
+      return null;
+    }
+    return (
+      <section className="border border-border">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">Nội dung khóa học</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              1 phần · Video demo · {formatDuration(item.durationSeconds) || "Xem trước"}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-muted/60 sm:px-5"
+          onClick={() => {
+            const node = document.getElementById("course-preview-video");
+            node?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+        >
+          <span className="inline-flex items-center gap-2">
+            <Play className="size-4" />
+            Video giới thiệu khóa học
+          </span>
+          <span className="text-muted-foreground">
+            {formatDuration(item.durationSeconds) || ""}
+          </span>
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border border-border">
+      <div className="flex flex-col gap-2 border-b border-border px-4 py-3 sm:flex-row sm:items-end sm:justify-between sm:px-5">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">Nội dung khóa học</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {sections.length} phần · {lessonTotal} bài giảng
+            {durationTotal ? ` · ${formatCurriculumLength(durationTotal)}` : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="self-start text-sm font-medium text-violet-700 hover:underline"
+          onClick={toggleAll}
+        >
+          {allOpen ? "Thu gọn tất cả" : "Mở rộng tất cả"}
+        </button>
+      </div>
+      <div>
+        {sections.map((section) => {
+          const opened = openIds.includes(section.id);
+          const lessons = Array.isArray(section.lessons) ? section.lessons : [];
+          const count = section.lessonCount || lessons.length;
+          return (
+            <div key={section.id} className="border-b border-border last:border-b-0">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 bg-muted/50 px-4 py-3 text-left hover:bg-muted/70 sm:px-5"
+                onClick={() => toggle(section.id)}
+              >
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <ChevronDown
+                    className={cn(
+                      "size-4 shrink-0 transition",
+                      opened ? "rotate-0" : "-rotate-90",
+                    )}
+                  />
+                  <span className="truncate font-semibold">{section.title}</span>
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">
+                  {count} bài giảng
+                  {section.durationSeconds
+                    ? ` • ${formatCurriculumLength(section.durationSeconds)}`
+                    : ""}
+                </span>
+              </button>
+              {opened ? (
+                <ul className="bg-background">
+                  {lessons.map((lesson) => {
+                    const canPlay = Boolean(lesson.isPreview && lesson.videoUrl);
+                    const playing = playingId === lesson.id && canPlay;
+                    return (
+                      <li key={lesson.id} className="border-t border-border">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm hover:bg-muted/40 sm:px-5"
+                          onClick={() => {
+                            if (canPlay) {
+                              setPlayingId(playing ? null : lesson.id);
+                              return;
+                            }
+                            toast.error("Bài giảng này dành cho học viên đã đăng ký");
+                          }}
+                        >
+                          <span className="inline-flex min-w-0 items-center gap-2">
+                            <Play className="size-4 shrink-0 text-muted-foreground" />
+                            <span className="truncate">{lesson.title}</span>
+                            {lesson.isPreview ? (
+                              <span className="shrink-0 text-xs font-medium text-violet-700">
+                                Xem trước
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="shrink-0 text-muted-foreground">
+                            {formatClock(lesson.durationSeconds)}
+                          </span>
+                        </button>
+                        {playing ? (
+                          <div className="px-4 pb-4 sm:px-5">
+                            <video
+                              src={lesson.videoUrl}
+                              controls
+                              autoPlay
+                              playsInline
+                              className="aspect-video w-full bg-black object-contain"
+                            />
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 function formatDate(value) {
   if (!value) {
@@ -284,7 +491,8 @@ function PurchaseCard({ item }) {
 
 function CourseDetailView({ slug }) {
   const items = use(getData());
-  const item = items.find((entry) => entry.slug === slug);
+  const detail = use(getCourse(slug));
+  const item = detail || items.find((entry) => entry.slug === slug);
   const [expanded, setExpanded] = useState(false);
   const [wished, setWished] = useState(false);
 
@@ -583,77 +791,7 @@ function CourseDetailView({ slug }) {
             </ul>
           </section>
 
-          {item.previewVideo ? (
-            <section className="border border-border">
-              <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
-                <div>
-                  <h2
-                    className="text-xl font-bold tracking-tight"
-                    style={{
-                      fontFamily: "'Roboto', sans-serif",
-                      lineHeight: 1.6,
-                      fontSize: "18px",
-                      fontWeight: "600",
-                      fontStyle: "normal",
-                      letterSpacing: "0.01em",
-                    }}
-                  >
-                    Nội dung khóa học
-                  </h2>
-                  <p
-                    className="mt-1 text-sm text-muted-foreground"
-                    style={{
-                      fontFamily: "'Roboto', sans-serif",
-                      lineHeight: 1.6,
-                      fontSize: "14px",
-                      fontWeight: "400",
-                      fontStyle: "normal",
-                      letterSpacing: "0.01em",
-                    }}
-                  >
-                    1 phần · Video demo ·{" "}
-                    {formatDuration(item.durationSeconds) || "Xem trước"}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-muted/60 sm:px-5"
-                onClick={() => {
-                  const node = document.getElementById("course-preview-video");
-                  node?.scrollIntoView({ behavior: "smooth", block: "center" });
-                }}
-              >
-                <span
-                  className="inline-flex items-center gap-2"
-                  style={{
-                    fontFamily: "'Roboto', sans-serif",
-                    lineHeight: 1.6,
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    fontStyle: "normal",
-                    letterSpacing: "0.01em",
-                  }}
-                >
-                  <Play className="size-4" />
-                  Video giới thiệu khóa học
-                </span>
-                <span
-                  className="text-muted-foreground"
-                  style={{
-                    fontFamily: "'Roboto', sans-serif",
-                    lineHeight: 1.6,
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    fontStyle: "normal",
-                    letterSpacing: "0.01em",
-                  }}
-                >
-                  {formatDuration(item.durationSeconds) || ""}
-                </span>
-              </button>
-            </section>
-          ) : null}
+          <Curriculum item={item} />
 
           {requirements.length > 0 ? (
             <section>

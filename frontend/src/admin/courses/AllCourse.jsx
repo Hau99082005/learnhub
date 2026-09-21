@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImagePlus, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { BookOpen, ImagePlus, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { CourseCurriculum } from "@/admin/courses/CourseCurriculum";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -332,6 +333,36 @@ const AllCourse = () => {
   };
 
   const countLabel = useMemo(() => `${items.length} khóa học`, [items.length]);
+  const path = window.location.pathname;
+  const curriculumMatch = path.match(/^\/(?:admin|quan-tri)\/courses\/(\d+)\/phan-hoc$/);
+  const curriculumId = curriculumMatch ? Number(curriculumMatch[1]) : null;
+  const curriculumCourse = curriculumId
+    ? items.find((item) => Number(item.id) === curriculumId)
+    : null;
+
+  if (curriculumId) {
+    if (loading) {
+      return <div className="h-40 animate-pulse rounded-xl bg-muted" />;
+    }
+    if (!curriculumCourse) {
+      return (
+        <section className="space-y-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Không tìm thấy khóa học</h1>
+          <Button type="button" onClick={() => (window.location.href = "/admin/courses")}>
+            Về danh sách khóa học
+          </Button>
+        </section>
+      );
+    }
+    return (
+      <CourseCurriculum
+        course={curriculumCourse}
+        onBack={() => {
+          window.location.href = "/admin/courses";
+        }}
+      />
+    );
+  }
 
   return (
     <section className="space-y-5">
@@ -449,7 +480,7 @@ const AllCourse = () => {
                   {item.instructorName || "Chưa có giảng viên"}
                   {item.categoryName ? ` · ${item.categoryName}` : ""}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -458,6 +489,16 @@ const AllCourse = () => {
                   >
                     <Pencil className="size-4" />
                     Sửa
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={() => {
+                      window.location.href = `/admin/courses/${item.id}/phan-hoc`;
+                    }}
+                  >
+                    <BookOpen className="size-4" />
+                    Phần học
                   </Button>
                   <Button
                     type="button"
@@ -816,6 +857,19 @@ const AllCourse = () => {
             </div>
 
             <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0">
+              {editing ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:mr-auto"
+                  onClick={() => {
+                    window.location.href = `/admin/courses/${editing.id}/phan-hoc`;
+                  }}
+                >
+                  <BookOpen className="size-4" />
+                  Quản lý phần học
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"

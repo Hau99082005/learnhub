@@ -211,7 +211,10 @@ const Page = () => {
   const isCategories = path === "/admin/categories" || path === "/quan-tri/categories";
   const isNews = path === "/admin/news" || path === "/quan-tri/news";
   const isNewsBlogs = path === "/admin/newsblogs" || path === "/quan-tri/newsblogs";
-  const isCourses = path === "/admin/courses" || path === "/quan-tri/courses";
+  const isCourses =
+    path === "/admin/courses" ||
+    path === "/quan-tri/courses" ||
+    /^\/(?:admin|quan-tri)\/courses\/\d+\/phan-hoc$/.test(path);
 
   return (
     <AdminLayout user={admin}>

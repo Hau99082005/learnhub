@@ -44,6 +44,7 @@ public class CourseServices {
     private final CourseImageStorage images;
     private final CourseVideoStorage videos;
     private final UserServicesInterfaces userServices;
+    private final CourseCurriculumService curriculum;
     private final EntityManager entityManager;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -54,6 +55,7 @@ public class CourseServices {
             CourseImageStorage images,
             CourseVideoStorage videos,
             UserServicesInterfaces userServices,
+            CourseCurriculumService curriculum,
             EntityManager entityManager) {
         this.courses = courses;
         this.categories = categories;
@@ -61,6 +63,7 @@ public class CourseServices {
         this.images = images;
         this.videos = videos;
         this.userServices = userServices;
+        this.curriculum = curriculum;
         this.entityManager = entityManager;
     }
 
@@ -73,10 +76,12 @@ public class CourseServices {
 
     @Transactional(readOnly = true)
     public CourseAdminDTO findPublished(String slug) {
-        return courses.findBySlugAndDeletedAtIsNull(slug)
-                .filter(item -> "PUBLISHED".equals(item.getStatus()))
-                .map(this::toAdminDto)
+        Course item = courses.findBySlugAndDeletedAtIsNull(slug)
+                .filter(entry -> "PUBLISHED".equals(entry.getStatus()))
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy khóa học"));
+        CourseAdminDTO dto = toAdminDto(item);
+        dto.setSections(curriculum.listPublic(item.getId()));
+        return dto;
     }
 
     @Transactional(readOnly = true)

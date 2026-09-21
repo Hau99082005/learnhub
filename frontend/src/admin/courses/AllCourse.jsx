@@ -137,11 +137,21 @@ const AllCourse = () => {
       language: item.language || "vi",
       level: item.level || "ALL",
       status: item.status || "DRAFT",
-      price: item.price == null ? "0" : String(item.price),
+      price:
+        item.price != null && Number(item.price) > 0
+          ? String(item.price)
+          : item.currency && /^\d+([.,]\d+)?$/.test(String(item.currency))
+            ? String(item.currency)
+            : "0",
       compareAtPrice:
         item.compareAtPrice == null ? "" : String(item.compareAtPrice),
-      currency: item.currency || "VND",
-      isFree: item.isFree !== false,
+      currency: /^[A-Za-z]{3}$/.test(item.currency || "")
+        ? String(item.currency).toUpperCase()
+        : "VND",
+      isFree:
+        item.price != null && Number(item.price) > 0
+          ? false
+          : item.isFree !== false,
       issuesCertificate: item.issuesCertificate === true,
       whatYouWillLearn: linesFromList(item.whatYouWillLearn),
       requirements: linesFromList(item.requirements),
@@ -180,6 +190,20 @@ const AllCourse = () => {
       return;
     }
     setVideoFile(next);
+    const url = URL.createObjectURL(next);
+    const player = document.createElement("video");
+    player.preload = "metadata";
+    player.onloadedmetadata = () => {
+      const seconds = Number.isFinite(player.duration)
+        ? Math.round(player.duration)
+        : 0;
+      URL.revokeObjectURL(url);
+      if (seconds > 0) {
+        setForm((prev) => ({ ...prev, durationSeconds: seconds }));
+      }
+    };
+    player.onerror = () => URL.revokeObjectURL(url);
+    player.src = url;
   };
 
   const uploadVideo = async () => {
@@ -216,6 +240,32 @@ const AllCourse = () => {
       toast.error("Vui lòng nhập tên khóa học");
       return;
     }
+    const amount = Number(String(form.price || "0").replace(",", "."));
+    const paid = Number.isFinite(amount) && amount > 0;
+    setSaving(true);
+    let previewVideo = form.previewVideo;
+    let durationSeconds = form.durationSeconds || 0;
+    try {
+      if (videoFile) {
+        setUploadingVideo(true);
+        setVideoProgress(1);
+        const ready = await uploadCourseVideo(videoFile, setVideoProgress);
+        previewVideo = ready.previewVideo || previewVideo;
+        durationSeconds = ready.durationSeconds || durationSeconds;
+        setForm((prev) => ({
+          ...prev,
+          previewVideo,
+          durationSeconds,
+          isFree: !paid,
+        }));
+        setVideoFile(null);
+      }
+    } catch (error) {
+      toast.error(error.message);
+      setUploadingVideo(false);
+      setSaving(false);
+      return;
+    }
     const payload = new FormData();
     payload.append("title", title);
     payload.append("subtitle", form.subtitle.trim());
@@ -223,14 +273,14 @@ const AllCourse = () => {
     payload.append("language", form.language);
     payload.append("level", form.level);
     payload.append("status", form.status);
-    payload.append("price", form.isFree ? "0" : form.price || "0");
+    payload.append("price", paid ? String(form.price).trim() : "0");
     if (form.compareAtPrice.trim()) {
       payload.append("compareAtPrice", form.compareAtPrice.trim());
     }
-    payload.append("currency", (form.currency || "VND").trim().slice(0, 3).toUpperCase());
-    payload.append("isFree", String(form.isFree));
+    payload.append("currency", /^[A-Za-z]{3}$/.test(form.currency || "") ? form.currency.toUpperCase() : "VND");
+    payload.append("isFree", String(!paid));
     payload.append("issuesCertificate", String(form.issuesCertificate));
-    payload.append("durationSeconds", String(form.durationSeconds || 0));
+    payload.append("durationSeconds", String(durationSeconds || 0));
     payload.append("whatYouWillLearn", form.whatYouWillLearn);
     payload.append("requirements", form.requirements);
     if (form.instructorId) {
@@ -239,13 +289,12 @@ const AllCourse = () => {
     if (form.categoryId) {
       payload.append("categoryId", form.categoryId);
     }
-    if (form.previewVideo) {
-      payload.append("previewVideo", form.previewVideo);
+    if (previewVideo) {
+      payload.append("previewVideo", previewVideo);
     }
     if (file) {
       payload.append("image", file);
     }
-    setSaving(true);
     try {
       if (editing) {
         await authForm(`/api/admin/courses/${editing.id}`, payload, "PUT");
@@ -259,6 +308,7 @@ const AllCourse = () => {
     } catch (error) {
       toast.error(error.message);
     } finally {
+      setUploadingVideo(false);
       setSaving(false);
     }
   };
@@ -649,8 +699,9 @@ const AllCourse = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="course-currency">Tiền tệ</Label>
-                <Input
+                <select
                   id="course-currency"
+                  className={SELECT_CLASS}
                   value={form.currency}
                   onChange={(event) =>
                     setForm((prev) => ({
@@ -658,7 +709,14 @@ const AllCourse = () => {
                       currency: event.target.value,
                     }))
                   }
-                />
+                >
+                  <option value="VND" className={OPTION_CLASS}>
+                    VND
+                  </option>
+                  <option value="USD" className={OPTION_CLASS}>
+                    USD
+                  </option>
+                </select>
               </div>
             </div>
 
@@ -668,44 +726,49 @@ const AllCourse = () => {
                 id="course-free"
                 checked={form.isFree}
                 onCheckedChange={(value) =>
-                  setForm((prev) => ({ ...prev, isFree: value === true }))
+                  setForm((prev) => ({
+                    ...prev,
+                    isFree: value === true,
+                    price: value === true ? "0" : prev.price,
+                  }))
                 }
               />
             </div>
-            {!form.isFree ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="course-price">Giá</Label>
-                  <Input
-                    id="course-price"
-                    type="number"
-                    min="0"
-                    value={form.price}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        price: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="course-compare">Giá gốc</Label>
-                  <Input
-                    id="course-compare"
-                    type="number"
-                    min="0"
-                    value={form.compareAtPrice}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        compareAtPrice: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="course-price">Giá</Label>
+                <Input
+                  id="course-price"
+                  type="number"
+                  min="0"
+                  value={form.price}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    const amount = Number(String(value).replace(",", "."));
+                    setForm((prev) => ({
+                      ...prev,
+                      price: value,
+                      isFree: !(Number.isFinite(amount) && amount > 0),
+                    }));
+                  }}
+                />
               </div>
-            ) : null}
+              <div className="grid gap-2">
+                <Label htmlFor="course-compare">Giá gốc</Label>
+                <Input
+                  id="course-compare"
+                  type="number"
+                  min="0"
+                  value={form.compareAtPrice}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      compareAtPrice: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
 
             <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
               <Label htmlFor="course-cert">Cấp chứng chỉ</Label>

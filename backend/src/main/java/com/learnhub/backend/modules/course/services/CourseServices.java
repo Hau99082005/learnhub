@@ -165,24 +165,30 @@ public class CourseServices {
         if ("PUBLISHED".equals(status) && item.getPublishedAt() == null) {
             item.setPublishedAt(LocalDateTime.now());
         }
-        boolean isFree = request.getIsFree() == null || request.getIsFree();
+        BigDecimal price = parseMoney(request.getPrice(), "price");
+        if (price.signum() <= 0 && request.getCurrency() != null && request.getCurrency().trim().matches("\\d+([.,]\\d+)?")) {
+            price = parseMoney(request.getCurrency(), "price");
+        }
+        boolean isFree = price.signum() <= 0;
         item.setIsFree(isFree);
-        item.setPrice(isFree ? BigDecimal.ZERO : parseMoney(request.getPrice(), "price"));
+        item.setPrice(isFree ? BigDecimal.ZERO : price);
         item.setCompareAtPrice(parseOptionalMoney(request.getCompareAtPrice(), "compareAtPrice"));
         String currency = request.getCurrency() == null || request.getCurrency().isBlank()
                 ? "VND"
                 : request.getCurrency().trim().toUpperCase();
-        if (currency.length() != 3) {
-            throw new AuthException(HttpStatus.BAD_REQUEST, "Mã tiền tệ không hợp lệ", "currency");
+        if (!currency.matches("[A-Z]{3}")) {
+            currency = "VND";
         }
         item.setCurrency(currency);
         item.setIssuesCertificate(request.getIssuesCertificate() != null && request.getIssuesCertificate());
-        if (request.getDurationSeconds() != null && request.getDurationSeconds() >= 0) {
-            item.setDurationSeconds(request.getDurationSeconds());
-        }
         item.setWhatYouWillLearn(toJsonList(request.getWhatYouWillLearn()));
         item.setRequirements(toJsonList(request.getRequirements()));
         applyPreviewVideo(item, request.getPreviewVideo(), creating);
+        int duration = request.getDurationSeconds() == null ? 0 : request.getDurationSeconds();
+        if (duration <= 0 && item.getPreviewVideo() != null) {
+            duration = videos.durationOf(item.getPreviewVideo());
+        }
+        item.setDurationSeconds(Math.max(duration, 0));
     }
 
     private void applyPreviewVideo(Course item, String nextVideo, boolean creating) {
@@ -267,7 +273,15 @@ public class CourseServices {
             return BigDecimal.ZERO;
         }
         try {
-            BigDecimal amount = new BigDecimal(value.trim());
+            String raw = value.trim().replace(" ", "");
+            if (raw.matches("\\d{1,3}(\\.\\d{3})+(,\\d+)?")) {
+                raw = raw.replace(".", "").replace(",", ".");
+            } else if (raw.matches("\\d{1,3}(,\\d{3})+(\\.\\d+)?")) {
+                raw = raw.replace(",", "");
+            } else {
+                raw = raw.replace(",", ".");
+            }
+            BigDecimal amount = new BigDecimal(raw);
             if (amount.signum() < 0) {
                 throw new AuthException(HttpStatus.BAD_REQUEST, "Giá không hợp lệ", field);
             }

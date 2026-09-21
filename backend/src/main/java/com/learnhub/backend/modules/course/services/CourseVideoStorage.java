@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.learnhub.backend.modules.course.dtos.VideoInitRequest;
 import com.learnhub.backend.modules.course.dtos.VideoReadyDTO;
 import com.learnhub.backend.modules.course.dtos.VideoSessionDTO;
+import com.learnhub.backend.modules.course.support.Mp4Duration;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
 
 @Service
@@ -56,9 +57,9 @@ public class CourseVideoStorage {
         this.ffmpeg = ffmpeg;
         this.ffprobe = ffprobe;
         this.nodes = resolveNodes(nodeConfig);
-        this.tempRoot = Paths.get(System.getProperty("user.dir"), "uploads", "video-tmp")
-                .toAbsolutePath()
-                .normalize();
+        Path first = this.nodes.get(0).root;
+        Path tmpParent = first.getParent() == null ? first : first.getParent();
+        this.tempRoot = tmpParent.resolve("tmp").toAbsolutePath().normalize();
         for (VideoNode node : nodes) {
             try {
                 Files.createDirectories(node.root);
@@ -251,9 +252,18 @@ public class CourseVideoStorage {
         }
     }
 
-    private int probeDuration(Path file) {
-        if (!hasBinary(ffprobe)) {
+    public int durationOf(String videoUrl) {
+        Path file = resolvePublished(videoUrl);
+        if (file == null) {
             return 0;
+        }
+        return probeDuration(file);
+    }
+
+    private int probeDuration(Path file) {
+        int parsed = Mp4Duration.seconds(file);
+        if (parsed > 0 || !hasBinary(ffprobe)) {
+            return parsed;
         }
         List<String> command = List.of(
                 ffprobe,
@@ -380,16 +390,38 @@ public class CourseVideoStorage {
                 if (trimmed.isEmpty()) {
                     continue;
                 }
-                resolved.add(new VideoNode("n" + index, Paths.get(trimmed).toAbsolutePath().normalize()));
+                Path path = Paths.get(trimmed).toAbsolutePath().normalize();
+                if (!usableRoot(path)) {
+                    continue;
+                }
+                resolved.add(new VideoNode("n" + index, path));
                 index += 1;
             }
         }
         if (resolved.isEmpty()) {
-            Path base = Paths.get(System.getProperty("user.dir"), "uploads", "videos").toAbsolutePath().normalize();
+            Path drive = Paths.get("C:\\learnhub-videos");
+            if (usableRoot(drive)) {
+                resolved.add(new VideoNode("n0", drive.resolve("n0").toAbsolutePath().normalize()));
+            }
+        }
+        if (resolved.isEmpty()) {
+            Path base = Paths.get("C:\\learnhub-videos").toAbsolutePath().normalize();
             resolved.add(new VideoNode("n0", base.resolve("n0")));
-            resolved.add(new VideoNode("n1", base.resolve("n1")));
         }
         return List.copyOf(resolved);
+    }
+
+    private boolean usableRoot(Path root) {
+        Path drive = root.getRoot();
+        if (drive != null && !Files.exists(drive)) {
+            return false;
+        }
+        try {
+            Files.createDirectories(root);
+            return Files.isWritable(root);
+        } catch (IOException ignored) {
+            return false;
+        }
     }
 
     private boolean looksLikeVideo(String filename) {

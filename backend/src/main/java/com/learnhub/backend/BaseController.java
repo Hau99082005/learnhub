@@ -3,10 +3,11 @@ package com.learnhub.backend;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -38,4 +39,15 @@ public class BaseController {
             throw new RuntimeException("Lỗi lấy dữ liệu users: " + e.getMessage());
         }
     }
+
+    @GetMapping("/course")
+    public List<Map<String, Object>> getCourses() {
+        try {
+            return jdbcTemplate.queryForList("SELECT * FROM courses");
+
+        } catch (DataAccessException e) {
+            throw new RuntimeException("Lỗi lấy dữ liệu courses: " + e.getMessage());
+        }
+    }
+
 }

@@ -6,6 +6,9 @@ import java.time.LocalDateTime;
 import com.learnhub.backend.modules.category.models.Category;
 import com.learnhub.backend.modules.user.models.user;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -69,10 +72,12 @@ public class Course {
     @Column(nullable = false, length = 3)
     private String currency = "VND";
 
-    @Column(name = "is_free", nullable = false)
+    @JdbcTypeCode(SqlTypes.BOOLEAN)
+    @Column(name = "is_free", nullable = false, columnDefinition = "TINYINT(1)")
     private Boolean isFree = true;
 
-    @Column(name = "issues_certificate", nullable = false)
+    @JdbcTypeCode(SqlTypes.BOOLEAN)
+    @Column(name = "issues_certificate", nullable = false, columnDefinition = "TINYINT(1)")
     private Boolean issuesCertificate = false;
 
     @Column(name = "duration_seconds", nullable = false)
@@ -87,10 +92,10 @@ public class Course {
     @Column(name = "rating_count", nullable = false)
     private Integer ratingCount = 0;
 
-    @Column(name = "what_you_will_learn", columnDefinition = "TEXT")
+    @Column(name = "what_you_will_learn", columnDefinition = "json")
     private String whatYouWillLearn = "[]";
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "json")
     private String requirements = "[]";
 
     @Column(name = "published_at")

@@ -297,7 +297,7 @@ const AllCourse = () => {
     }
     try {
       if (editing) {
-        await authForm(`/api/admin/courses/${editing.id}`, payload, "PUT");
+        await authForm(`/api/admin/courses/${editing.id}`, payload, "POST");
         toast.success("Đã cập nhật khóa học");
       } else {
         await authForm("/api/admin/courses", payload, "POST");

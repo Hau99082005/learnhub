@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.persistence.EntityManager;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,6 +44,7 @@ public class CourseServices {
     private final CourseImageStorage images;
     private final CourseVideoStorage videos;
     private final UserServicesInterfaces userServices;
+    private final EntityManager entityManager;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public CourseServices(
@@ -50,13 +53,15 @@ public class CourseServices {
             userRepository users,
             CourseImageStorage images,
             CourseVideoStorage videos,
-            UserServicesInterfaces userServices) {
+            UserServicesInterfaces userServices,
+            EntityManager entityManager) {
         this.courses = courses;
         this.categories = categories;
         this.users = users;
         this.images = images;
         this.videos = videos;
         this.userServices = userServices;
+        this.entityManager = entityManager;
     }
 
     @Transactional(readOnly = true)
@@ -105,7 +110,7 @@ public class CourseServices {
         user admin = requireAdminAccount(authorization);
         Course item = new Course();
         apply(item, request, images.save(image), true, admin);
-        courses.save(item);
+        courses.saveAndFlush(item);
         return toAdminDto(item);
     }
 
@@ -120,19 +125,20 @@ public class CourseServices {
             imageUrl = next;
         }
         apply(item, request, imageUrl, false, admin);
-        courses.save(item);
+        courses.saveAndFlush(item);
         return toAdminDto(item);
     }
 
     @Transactional
     public void delete(String authorization, Long id) {
         userServices.requireAdmin(authorization);
-        Course item = requireCourse(id);
+        Course item = courses.findById(id)
+                .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy khóa học"));
         images.deleteIfOwned(item.getImages());
         videos.deleteIfOwned(item.getPreviewVideo());
-        item.setDeletedAt(LocalDateTime.now());
-        item.setStatus("ARCHIVED");
-        courses.save(item);
+        deleteDependents(item.getId());
+        courses.delete(item);
+        courses.flush();
     }
 
     private void apply(
@@ -244,6 +250,40 @@ public class CourseServices {
             throw new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy khóa học");
         }
         return item;
+    }
+
+    private void deleteDependents(Long courseId) {
+        exec("DELETE qaa FROM quiz_attempt_answers qaa JOIN quiz_attempts qa ON qa.id = qaa.attempt_id JOIN enrollments e ON e.id = qa.enrollment_id WHERE e.course_id = :id", courseId);
+        exec("DELETE qaa FROM quiz_attempt_answers qaa JOIN quiz_questions qq ON qq.id = qaa.question_id JOIN quizzes q ON q.id = qq.quiz_id JOIN lessons l ON l.id = q.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE qa FROM quiz_attempts qa JOIN enrollments e ON e.id = qa.enrollment_id WHERE e.course_id = :id", courseId);
+        exec("DELETE qo FROM quiz_options qo JOIN quiz_questions qq ON qq.id = qo.question_id JOIN quizzes q ON q.id = qq.quiz_id JOIN lessons l ON l.id = q.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE qq FROM quiz_questions qq JOIN quizzes q ON q.id = qq.quiz_id JOIN lessons l ON l.id = q.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE q FROM quizzes q JOIN lessons l ON l.id = q.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE asb FROM assignment_submissions asb JOIN assignments a ON a.id = asb.assignment_id JOIN lessons l ON l.id = a.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE a FROM assignments a JOIN lessons l ON l.id = a.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE lp FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE lp FROM lesson_progress lp JOIN enrollments e ON e.id = lp.enrollment_id WHERE e.course_id = :id", courseId);
+        exec("DELETE lr FROM lesson_resources lr JOIN lessons l ON l.id = lr.lesson_id JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE c FROM certificates c JOIN enrollments e ON e.id = c.enrollment_id WHERE e.course_id = :id", courseId);
+        exec("UPDATE comments SET parent_id = NULL WHERE course_id = :id", courseId);
+        exec("DELETE FROM comments WHERE course_id = :id", courseId);
+        exec("DELETE l FROM lessons l JOIN course_sections s ON s.id = l.section_id WHERE s.course_id = :id", courseId);
+        exec("DELETE FROM course_sections WHERE course_id = :id", courseId);
+        exec("DELETE FROM announcements WHERE course_id = :id", courseId);
+        exec("DELETE FROM cart_items WHERE course_id = :id", courseId);
+        exec("DELETE FROM coupon_courses WHERE course_id = :id", courseId);
+        exec("DELETE FROM course_faqs WHERE course_id = :id", courseId);
+        exec("DELETE FROM course_instructors WHERE course_id = :id", courseId);
+        exec("DELETE FROM course_tags WHERE course_id = :id", courseId);
+        exec("DELETE FROM enrollments WHERE course_id = :id", courseId);
+        exec("DELETE FROM live_sessions WHERE course_id = :id", courseId);
+        exec("DELETE FROM order_items WHERE course_id = :id", courseId);
+        exec("DELETE FROM reviews WHERE course_id = :id", courseId);
+        exec("DELETE FROM wishlists WHERE course_id = :id", courseId);
+    }
+
+    private void exec(String sql, Long courseId) {
+        entityManager.createNativeQuery(sql).setParameter("id", courseId).executeUpdate();
     }
 
     private user requireAdminAccount(String authorization) {

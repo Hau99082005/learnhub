@@ -67,7 +67,10 @@ function CourseCurriculum({ course, onBack }) {
   const [lessonTitle, setLessonTitle] = useState({});
   const [lessonPreview, setLessonPreview] = useState({});
   const [lessonFile, setLessonFile] = useState({});
+  const [lessonReady, setLessonReady] = useState({});
   const [progress, setProgress] = useState({});
+  const [uploading, setUploading] = useState({});
+  const [playingId, setPlayingId] = useState(null);
 
   const courseId = course?.id;
   const path = courseId ? `/api/admin/courses/${courseId}/sections` : "";
@@ -101,7 +104,10 @@ function CourseCurriculum({ course, onBack }) {
     setLessonTitle({});
     setLessonPreview({});
     setLessonFile({});
+    setLessonReady({});
     setProgress({});
+    setUploading({});
+    setPlayingId(null);
     load();
   }, [courseId]);
 
@@ -176,34 +182,91 @@ function CourseCurriculum({ course, onBack }) {
     }
   };
 
-  const addLesson = async (section) => {
-    const file = lessonFile[section.id];
-    const title = (lessonTitle[section.id] || fileTitle(file)).trim();
-    if (!title) {
-      toast.error("Vui lòng nhập tên bài giảng");
+  const onPickLessonFile = (sectionId, event) => {
+    const next = event.target.files?.[0];
+    event.target.value = "";
+    if (!next) {
       return;
     }
+    if (
+      !next.type.startsWith("video/") &&
+      !/\.(mp4|webm|mov|mkv|avi)$/i.test(next.name)
+    ) {
+      toast.error("Vui lòng chọn file video");
+      return;
+    }
+    setLessonFile((prev) => ({ ...prev, [sectionId]: next }));
+    setLessonReady((prev) => ({ ...prev, [sectionId]: null }));
+    setProgress((prev) => ({ ...prev, [sectionId]: 0 }));
+    setLessonTitle((prev) => ({
+      ...prev,
+      [sectionId]: prev[sectionId] || fileTitle(next),
+    }));
+    const url = URL.createObjectURL(next);
+    const player = document.createElement("video");
+    player.preload = "metadata";
+    player.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+    };
+    player.onerror = () => URL.revokeObjectURL(url);
+    player.src = url;
+  };
+
+  const uploadLessonVideo = async (sectionId) => {
+    const file = lessonFile[sectionId];
     if (!file) {
       toast.error("Vui lòng chọn video bài giảng");
       return;
     }
-    setSaving(true);
-    setProgress((prev) => ({ ...prev, [section.id]: 1 }));
+    setUploading((prev) => ({ ...prev, [sectionId]: true }));
+    setProgress((prev) => ({ ...prev, [sectionId]: 1 }));
     try {
       const ready = await uploadCourseVideo(file, (value) => {
-        setProgress((prev) => ({ ...prev, [section.id]: value }));
+        setProgress((prev) => ({ ...prev, [sectionId]: value }));
       });
+      setLessonReady((prev) => ({
+        ...prev,
+        [sectionId]: {
+          previewVideo: ready.previewVideo,
+          durationSeconds: ready.durationSeconds || 0,
+          bytes: ready.bytes || file.size,
+          originalName: file.name,
+        },
+      }));
+      setLessonFile((prev) => ({ ...prev, [sectionId]: null }));
+      toast.success("Đã tải và nén video bài giảng");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setUploading((prev) => ({ ...prev, [sectionId]: false }));
+    }
+  };
+
+  const addLesson = async (section) => {
+    const title = (lessonTitle[section.id] || "").trim();
+    const ready = lessonReady[section.id];
+    if (!title) {
+      toast.error("Vui lòng nhập tên bài giảng");
+      return;
+    }
+    if (!ready?.previewVideo) {
+      toast.error("Vui lòng tải và nén video bài giảng");
+      return;
+    }
+    setSaving(true);
+    try {
       await authPost(`${path}/${section.id}/lessons`, {
         title,
         videoUrl: ready.previewVideo,
         durationSeconds: ready.durationSeconds || 0,
         isPreview: Boolean(lessonPreview[section.id]),
         isPublished: true,
-        originalName: file.name,
-        bytes: ready.bytes || file.size,
+        originalName: ready.originalName,
+        bytes: ready.bytes,
       });
       setLessonTitle((prev) => ({ ...prev, [section.id]: "" }));
       setLessonFile((prev) => ({ ...prev, [section.id]: null }));
+      setLessonReady((prev) => ({ ...prev, [section.id]: null }));
       setLessonPreview((prev) => ({ ...prev, [section.id]: false }));
       setProgress((prev) => ({ ...prev, [section.id]: 0 }));
       toast.success("Đã thêm bài giảng");
@@ -212,6 +275,42 @@ function CourseCurriculum({ course, onBack }) {
       toast.error(error.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const replaceLessonVideo = async (section, lesson, event) => {
+    const next = event.target.files?.[0];
+    event.target.value = "";
+    if (!next) {
+      return;
+    }
+    if (
+      !next.type.startsWith("video/") &&
+      !/\.(mp4|webm|mov|mkv|avi)$/i.test(next.name)
+    ) {
+      toast.error("Vui lòng chọn file video");
+      return;
+    }
+    const key = `lesson-${lesson.id}`;
+    setUploading((prev) => ({ ...prev, [key]: true }));
+    setProgress((prev) => ({ ...prev, [key]: 1 }));
+    try {
+      const ready = await uploadCourseVideo(next, (value) => {
+        setProgress((prev) => ({ ...prev, [key]: value }));
+      });
+      await authPut(`${path}/${section.id}/lessons/${lesson.id}`, {
+        videoUrl: ready.previewVideo,
+        durationSeconds: ready.durationSeconds || 0,
+        originalName: next.name,
+        bytes: ready.bytes || next.size,
+      });
+      toast.success("Đã tải và nén video bài giảng");
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setUploading((prev) => ({ ...prev, [key]: false }));
+      setProgress((prev) => ({ ...prev, [key]: 0 }));
     }
   };
 
@@ -422,64 +521,125 @@ function CourseCurriculum({ course, onBack }) {
                     {lessons.map((lesson, lessonIndex) => (
                       <div
                         key={lesson.id}
-                        className="flex flex-col gap-2 border-b border-border py-3 last:border-b-0 sm:flex-row sm:items-center"
+                        className="border-b border-border py-2 last:border-b-0"
                       >
-                        <div className="flex min-w-0 flex-1 items-center gap-2">
-                          <Play className="size-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm">{lesson.title}</p>
-                            {lesson.isPreview ? (
-                              <p className="text-xs text-violet-600">Xem trước</p>
-                            ) : null}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <button
+                            type="button"
+                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                            onClick={() => {
+                              if (!lesson.videoUrl) {
+                                toast.error("Bài giảng chưa có video");
+                                return;
+                              }
+                              setPlayingId((value) =>
+                                value === lesson.id ? null : lesson.id,
+                              );
+                            }}
+                          >
+                            <Play className="size-4 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm">
+                                {lesson.title}
+                              </span>
+                              {lesson.isPreview ? (
+                                <span className="text-xs text-violet-600">
+                                  Xem trước
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
+                          <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
+                            <span className="text-xs text-muted-foreground sm:text-sm">
+                              {formatClock(lesson.durationSeconds)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={saving}
+                              onClick={() => togglePreview(section, lesson)}
+                              style={{ borderRadius: "5px" }}
+                            >
+                              {lesson.isPreview ? "Bỏ xem trước" : "Cho xem trước"}
+                            </Button>
+                            <label
+                              className="inline-flex h-8 cursor-pointer items-center gap-1.5 border border-border px-2.5 text-sm"
+                              style={{ borderRadius: "5px" }}
+                            >
+                              <Upload className="size-3.5" />
+                              {uploading[`lesson-${lesson.id}`]
+                                ? `Đang tải ${progress[`lesson-${lesson.id}`] || 0}%`
+                                : "Đổi video"}
+                              <input
+                                type="file"
+                                accept="video/mp4,video/webm,video/quicktime,video/x-matroska,.mp4,.webm,.mov,.mkv"
+                                className="sr-only"
+                                disabled={saving || uploading[`lesson-${lesson.id}`]}
+                                onChange={(event) =>
+                                  replaceLessonVideo(section, lesson, event)
+                                }
+                              />
+                            </label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={saving || lessonIndex === 0}
+                              onClick={() => moveLesson(section, lesson, "up")}
+                              aria-label="Lên"
+                            >
+                              <ArrowUp className="size-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={saving || lessonIndex === lessons.length - 1}
+                              onClick={() => moveLesson(section, lesson, "down")}
+                              aria-label="Xuống"
+                            >
+                              <ArrowDown className="size-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={saving}
+                              onClick={() => removeLesson(section, lesson)}
+                              aria-label="Xóa bài"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-                          <span className="text-sm text-muted-foreground">
-                            {formatClock(lesson.durationSeconds)}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={saving}
-                            onClick={() => togglePreview(section, lesson)}
-                          >
-                            {lesson.isPreview ? "Bỏ xem trước" : "Cho xem trước"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={saving || lessonIndex === 0}
-                            onClick={() => moveLesson(section, lesson, "up")}
-                            aria-label="Lên"
-                          >
-                            <ArrowUp className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={saving || lessonIndex === lessons.length - 1}
-                            onClick={() => moveLesson(section, lesson, "down")}
-                            aria-label="Xuống"
-                          >
-                            <ArrowDown className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={saving}
-                            onClick={() => removeLesson(section, lesson)}
-                            aria-label="Xóa bài"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
+                        {progress[`lesson-${lesson.id}`] ? (
+                          <div className="mt-2 h-1.5 overflow-hidden bg-muted" style={{ borderRadius: "5px" }}>
+                            <div
+                              className="h-full bg-primary transition-all"
+                              style={{
+                                width: `${progress[`lesson-${lesson.id}`]}%`,
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        {playingId === lesson.id && lesson.videoUrl ? (
+                          <video
+                            src={lesson.videoUrl}
+                            controls
+                            autoPlay
+                            playsInline
+                            preload="metadata"
+                            className="mt-2 aspect-video w-full max-w-[13rem] bg-black object-contain sm:max-w-[16rem]"
+                            style={{ borderRadius: "5px" }}
+                          />
+                        ) : null}
                       </div>
                     ))}
-                    <div className="mt-3 grid gap-3 rounded-lg border border-dashed border-border p-3">
+                    <div
+                      className="mt-3 grid gap-3 border border-dashed border-border p-3"
+                      style={{ borderRadius: "5px" }}
+                    >
                       <Input
                         value={lessonTitle[section.id] || ""}
                         onChange={(event) =>
@@ -489,33 +649,86 @@ function CourseCurriculum({ course, onBack }) {
                           }))
                         }
                         placeholder="Tên bài giảng"
+                        style={{ borderRadius: "5px" }}
                       />
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-                          <Upload className="size-4" />
-                          <span>
-                            {lessonFile[section.id]?.name || "Chọn video MP4"}
+                      <div className="grid gap-2">
+                        <Label htmlFor={`lesson-video-${section.id}`}>
+                          Video bài giảng
+                        </Label>
+                        <label
+                          htmlFor={`lesson-video-${section.id}`}
+                          className="flex cursor-pointer flex-col gap-3 border border-dashed border-border bg-muted/40 p-3 sm:flex-row sm:items-center sm:p-4"
+                          style={{ borderRadius: "5px" }}
+                        >
+                          <span
+                            className="flex size-12 shrink-0 items-center justify-center border border-border bg-background"
+                            style={{ borderRadius: "5px" }}
+                          >
+                            <Upload className="size-6" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">
+                              {lessonFile[section.id] ||
+                              lessonReady[section.id]?.previewVideo
+                                ? "Đổi file video"
+                                : "Tải video bài giảng"}
+                            </span>
+                            <span className="mt-1 block truncate text-xs text-muted-foreground sm:text-sm">
+                              {lessonFile[section.id]?.name ||
+                                (lessonReady[section.id]?.previewVideo
+                                  ? "Đã nén video"
+                                  : "MP4, WEBM, MOV, MKV")}
+                            </span>
                           </span>
                           <input
+                            id={`lesson-video-${section.id}`}
                             type="file"
                             accept="video/mp4,video/webm,video/quicktime,video/x-matroska,.mp4,.webm,.mov,.mkv"
                             className="sr-only"
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              if (!file) {
-                                return;
-                              }
-                              setLessonFile((prev) => ({
-                                ...prev,
-                                [section.id]: file,
-                              }));
-                              setLessonTitle((prev) => ({
-                                ...prev,
-                                [section.id]: prev[section.id] || fileTitle(file),
-                              }));
-                            }}
+                            onChange={(event) =>
+                              onPickLessonFile(section.id, event)
+                            }
                           />
                         </label>
+                        {lessonFile[section.id] ? (
+                          <p className="truncate text-xs text-muted-foreground sm:text-sm">
+                            {lessonFile[section.id].name}
+                          </p>
+                        ) : null}
+                        {lessonFile[section.id] ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={uploading[section.id]}
+                              onClick={() => uploadLessonVideo(section.id)}
+                              style={{ borderRadius: "5px" }}
+                            >
+                              {uploading[section.id]
+                                ? `Đang tải ${progress[section.id] || 0}%`
+                                : "Tải và nén video"}
+                            </Button>
+                          </div>
+                        ) : null}
+                        {uploading[section.id] ? (
+                          <div className="h-2 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full bg-primary transition-all"
+                              style={{ width: `${progress[section.id] || 0}%` }}
+                            />
+                          </div>
+                        ) : null}
+                        {lessonReady[section.id]?.previewVideo ? (
+                          <video
+                            src={lessonReady[section.id].previewVideo}
+                            controls
+                            playsInline
+                            className="aspect-video w-full max-w-[13rem] bg-black object-contain sm:max-w-[16rem]"
+                            style={{ borderRadius: "5px" }}
+                          />
+                        ) : null}
+                      </div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <label className="inline-flex items-center gap-2 text-sm">
                           <Switch
                             checked={Boolean(lessonPreview[section.id])}
@@ -530,23 +743,14 @@ function CourseCurriculum({ course, onBack }) {
                         </label>
                         <Button
                           type="button"
-                          disabled={saving}
+                          disabled={saving || uploading[section.id]}
                           className="sm:ml-auto"
                           onClick={() => addLesson(section)}
+                          style={{ borderRadius: "5px" }}
                         >
-                          {progress[section.id]
-                            ? `Đang tải ${progress[section.id]}%`
-                            : "Tải video vào phần"}
+                          Thêm bài giảng
                         </Button>
                       </div>
-                      {progress[section.id] ? (
-                        <div className="h-2 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full bg-primary transition-all"
-                            style={{ width: `${progress[section.id]}%` }}
-                          />
-                        </div>
-                      ) : null}
                     </div>
                   </div>
                 ) : null}

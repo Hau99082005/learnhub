@@ -4,6 +4,8 @@ import Header from "@/components/Layout/Header"
 import Footer from "@/components/Layout/footer"
 import Banner from "@/components/Banner"
 import Category from "@/components/Category"
+import Course from "@/components/Course"
+import CoursePage from "@/course/page"
 import CategoryPage from "@/category/page"
 import Instructors from "@/components/Instructors"
 import TeachStart from "@/components/TeachStart"
@@ -84,7 +86,12 @@ function App() {
             <>
               <Banner />
               <Category />
+              <Course />
             </>
+          ) : path === "/khoa-hoc" ? (
+            <CoursePage />
+          ) : path.startsWith("/khoa-hoc/") && path.split("/").filter(Boolean)[1] ? (
+            <CoursePage slug={decodeURIComponent(path.split("/").filter(Boolean)[1])} />
           ) : path === "/gioi-thieu" ? (
             <About />
           ) : path === "/tin-tuc" || path.startsWith("/tin-tuc/") ? (

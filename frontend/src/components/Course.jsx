@@ -78,8 +78,11 @@ function CourseCard({ item, wished, onWish }) {
   const href = `/khoa-hoc/${item.slug}`;
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_8px_24px_-18px_rgba(15,23,42,0.45)] transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_22px_40px_-24px_rgba(91,33,182,0.45)] dark:hover:border-violet-500/40">
-      <a href={href} className="relative block aspect-[16/9] overflow-hidden bg-muted">
+    <article className="group flex h-full w-full min-w-0 flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-[0_8px_24px_-18px_rgba(15,23,42,0.45)] transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_22px_40px_-24px_rgba(91,33,182,0.45)] dark:hover:border-violet-500/40">
+      <a
+        href={href}
+        className="relative block aspect-[16/9] overflow-hidden bg-muted"
+      >
         {item.images ? (
           <img
             src={item.images}
@@ -98,7 +101,19 @@ function CourseCard({ item, wished, onWish }) {
               Bán chạy nhất
             </span>
           ) : null}
-          <span className="rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold text-slate-900 shadow-sm backdrop-blur-sm">
+          <span
+            className="rounded-none bg-white/95 px-2 py-1 text-[11px] font-semibold text-slate-900 shadow-sm backdrop-blur-sm"
+            style={{
+              border: "none",
+              borderRadius: "5px",
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "12px",
+              fontWeight: "500",
+              fontStyle: "normal",
+              lineHeight: 1.2,
+              letterSpacing: "0.01em",
+            }}
+          >
             {level}
           </span>
         </div>
@@ -113,7 +128,10 @@ function CourseCard({ item, wished, onWish }) {
           }}
         >
           <Heart
-            className={cn("size-4 transition", wished && "fill-rose-500 text-rose-500")}
+            className={cn(
+              "size-4 transition",
+              wished && "fill-rose-500 text-rose-500",
+            )}
           />
         </button>
         {item.previewVideo ? (
@@ -130,13 +148,26 @@ function CourseCard({ item, wished, onWish }) {
             className="line-clamp-2 min-h-11 text-[15px] font-semibold tracking-tight text-foreground transition group-hover:text-violet-700 dark:group-hover:text-violet-300"
             style={{
               fontFamily: "'Roboto', sans-serif",
-              lineHeight: 1.35,
+              lineHeight: 1.4,
               letterSpacing: "0.01em",
+              fontSize: "16px",
+              fontWeight: "500",
+              fontStyle: "normal",
             }}
           >
             {item.title}
           </h3>
-          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+          <p
+            className="mt-1 line-clamp-1 text-sm text-muted-foreground"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+              fontSize: "14px",
+              fontWeight: "400",
+              fontStyle: "normal",
+            }}
+          >
             {item.instructorName || "Giảng viên LearnHub"}
           </p>
         </a>
@@ -164,10 +195,32 @@ function CourseCard({ item, wished, onWish }) {
               </span>
             </>
           ) : (
-            <span className="text-muted-foreground">Chưa có đánh giá</span>
+            <span
+              className="text-muted-foreground"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                lineHeight: 1.4,
+                letterSpacing: "0.01em",
+                fontSize: "14px",
+                fontWeight: "400",
+                fontStyle: "normal",
+              }}
+            >
+              Chưa có đánh giá
+            </span>
           )}
         </div>
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <p
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+          style={{
+            fontFamily: "'Roboto', sans-serif",
+            lineHeight: 1.4,
+            letterSpacing: "0.01em",
+            fontSize: "13px",
+            fontWeight: "400",
+            fontStyle: "normal",
+          }}
+        >
           <span>Khóa học</span>
           {duration ? (
             <>
@@ -187,11 +240,33 @@ function CourseCard({ item, wished, onWish }) {
         </p>
         <div className="mt-auto flex items-end justify-between gap-2 pt-1">
           <div>
-            <p className="text-base font-bold text-violet-700 dark:text-violet-300">
+            <p
+              className="text-base font-bold text-violet-700 dark:text-violet-300"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                lineHeight: 1.4,
+                letterSpacing: "0.01em",
+                fontSize: "18px",
+                fontWeight: "700",
+                fontStyle: "normal",
+              }}
+            >
               {isFree ? "Miễn phí" : formatMoney(item.price, item.currency)}
             </p>
-            {!isFree && Number.isFinite(compare) && compare > Number(item.price) ? (
-              <p className="text-xs text-muted-foreground line-through">
+            {!isFree &&
+            Number.isFinite(compare) &&
+            compare > Number(item.price) ? (
+              <p
+                className="text-xs text-muted-foreground line-through"
+                style={{
+                  fontFamily: "'Roboto', sans-serif",
+                  lineHeight: 1.6,
+                  letterSpacing: "0.01em",
+                  fontSize: "14px",
+                  fontWeight: "400",
+                  fontStyle: "normal",
+                }}
+              >
                 {formatMoney(compare, item.currency)}
               </p>
             ) : null}
@@ -199,10 +274,20 @@ function CourseCard({ item, wished, onWish }) {
         </div>
         <button
           type="button"
-          className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 active:translate-y-px"
+          className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-none bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 active:translate-y-px"
           onClick={(event) => {
             event.preventDefault();
             toast.success(`Đã thêm “${item.title}” vào giỏ hàng`);
+          }}
+          style={{
+            fontFamily: "'Roboto', sans-serif",
+            lineHeight: 1.4,
+            letterSpacing: "0.01em",
+            fontSize: "15px",
+            fontWeight: "400",
+            fontStyle: "normal",
+            border: "none",
+            borderRadius: "5px",
           }}
         >
           <ShoppingBag className="size-4" />
@@ -214,7 +299,8 @@ function CourseCard({ item, wished, onWish }) {
 }
 
 function CourseControls({ count }) {
-  const { scrollPrev, scrollNext, canScrollPrev, canScrollNext } = useCarousel();
+  const { scrollPrev, scrollNext, canScrollPrev, canScrollNext } =
+    useCarousel();
 
   if (count < 2) {
     return null;
@@ -270,20 +356,55 @@ function CourseView() {
       <div className="relative mx-auto w-full max-w-7xl px-3 py-8 sm:px-6 sm:py-10 lg:py-12">
         <div className="mb-5 flex flex-col gap-1 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium tracking-wide text-violet-700 uppercase dark:text-violet-300">
+            <p
+              className="text-sm font-medium tracking-wide text-violet-700 uppercase dark:text-violet-300"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: "24px",
+                fontStyle: "normal",
+                fontWeight: "500",
+                lineHeight: 1.4,
+                letterSpacing: "0.01em",
+              }}
+            >
               Lộ trình học tập
             </p>
             <h2
               className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
-              style={{ fontFamily: "'Roboto', sans-serif" }}
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: "32px",
+                fontStyle: "normal",
+                fontWeight: "500",
+                lineHeight: 1.4,
+                letterSpacing: "0.01em",
+              }}
             >
               Lĩnh vực sẽ học tiếp theo
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+            <p
+              className="mt-1 text-sm text-muted-foreground sm:text-base"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: "17px",
+                fontStyle: "normal",
+                fontWeight: "400",
+                lineHeight: 1.6,
+                letterSpacing: "0.01em",
+              }}
+            >
               Được đề xuất cho bạn
             </p>
           </div>
           <a
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "17px",
+              fontStyle: "normal",
+              fontWeight: "400",
+              lineHeight: 1.6,
+              letterSpacing: "0.01em",
+            }}
             href="/khoa-hoc"
             className="text-sm font-medium text-violet-700 underline-offset-4 transition hover:underline dark:text-violet-300"
           >
@@ -299,7 +420,7 @@ function CourseView() {
               {items.map((item, index) => (
                 <CarouselItem
                   key={item.id}
-                  className="basis-[82%] pl-3 sm:basis-[48%] sm:pl-4 md:basis-[33.333%] lg:basis-[25%] xl:basis-1/5"
+                  className="min-w-0 basis-[80%] pl-3 sm:basis-[52%] sm:pl-4 md:basis-[44%] lg:basis-[36%] xl:basis-[31%] 2xl:basis-[27%]"
                   style={{ animationDelay: `${index * 70}ms` }}
                 >
                   <div className="h-full animate-in fade-in slide-in-from-bottom-3 duration-500">
@@ -329,7 +450,7 @@ function CourseFallback() {
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="min-w-[78%] overflow-hidden rounded-2xl border border-border sm:min-w-[46%] md:min-w-[31%] lg:min-w-[23%]"
+              className="min-w-[80%] overflow-hidden rounded-none border border-border sm:min-w-[50%] md:min-w-[42%] lg:min-w-[34%] xl:min-w-[30%]"
             >
               <div className="aspect-[16/9] animate-pulse bg-muted" />
               <div className="space-y-3 p-4">
@@ -374,9 +495,11 @@ function CourseGridView() {
           {items.length} khóa học đang mở
         </p>
         {items.length === 0 ? (
-          <p className="mt-10 text-muted-foreground">Chưa có khóa học xuất bản.</p>
+          <p className="mt-10 text-muted-foreground">
+            Chưa có khóa học xuất bản.
+          </p>
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {items.map((item) => (
               <CourseCard
                 key={item.id}
@@ -415,7 +538,9 @@ function CourseDetailView({ slug }) {
       <div className="bg-slate-950 text-white">
         <div className="mx-auto grid w-full max-w-7xl gap-8 px-3 py-8 sm:px-6 sm:py-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div>
-            <p className="text-sm text-violet-300">{item.categoryName || "Khóa học"}</p>
+            <p className="text-sm text-violet-300">
+              {item.categoryName || "Khóa học"}
+            </p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-4xl">
               {item.title}
             </h1>
@@ -429,22 +554,28 @@ function CourseDetailView({ slug }) {
               {rating > 0 ? ` · ${rating.toFixed(1)} ★` : ""}
             </p>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white text-foreground shadow-2xl">
+          <div className="overflow-hidden rounded-none border border-white/10 bg-white text-foreground shadow-2xl">
             {item.images ? (
-              <img src={item.images} alt={item.title} className="aspect-[16/9] w-full object-cover" />
+              <img
+                src={item.images}
+                alt={item.title}
+                className="aspect-[16/9] w-full object-cover"
+              />
             ) : null}
             <div className="space-y-3 p-4">
               <p className="text-2xl font-bold text-violet-700">
                 {isFree ? "Miễn phí" : formatMoney(item.price, item.currency)}
               </p>
-              {!isFree && Number.isFinite(compare) && compare > Number(item.price) ? (
+              {!isFree &&
+              Number.isFinite(compare) &&
+              compare > Number(item.price) ? (
                 <p className="text-sm text-muted-foreground line-through">
                   {formatMoney(compare, item.currency)}
                 </p>
               ) : null}
               <a
                 href="/khoa-hoc"
-                className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600"
+                className="inline-flex h-10 w-full items-center justify-center rounded-none bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600"
               >
                 Quay lại danh sách
               </a>

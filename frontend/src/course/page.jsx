@@ -1,4 +1,5 @@
-import { CourseDetail, CourseGrid } from "@/components/Course";
+import { CourseGrid } from "@/components/Course";
+import { CourseDetail } from "@/components/CourseDetail";
 
 const CoursePage = ({ slug }) => {
   if (slug) {

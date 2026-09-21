@@ -515,78 +515,6 @@ function CourseGridView() {
   );
 }
 
-function CourseDetailView({ slug }) {
-  const items = use(getData());
-  const item = items.find((entry) => entry.slug === slug);
-
-  if (!item) {
-    return (
-      <section className="mx-auto w-full max-w-7xl px-3 py-10 sm:px-6">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Không tìm thấy khóa học
-        </h1>
-      </section>
-    );
-  }
-
-  const isFree = item.isFree === true || Number(item.price) <= 0;
-  const compare = Number(item.compareAtPrice);
-  const rating = Number(item.ratingAvg) || 0;
-
-  return (
-    <section className="w-full">
-      <div className="bg-slate-950 text-white">
-        <div className="mx-auto grid w-full max-w-7xl gap-8 px-3 py-8 sm:px-6 sm:py-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div>
-            <p className="text-sm text-violet-300">
-              {item.categoryName || "Khóa học"}
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-4xl">
-              {item.title}
-            </h1>
-            {item.subtitle ? (
-              <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">
-                {item.subtitle}
-              </p>
-            ) : null}
-            <p className="mt-4 text-sm text-white/80">
-              {item.instructorName || "Giảng viên LearnHub"}
-              {rating > 0 ? ` · ${rating.toFixed(1)} ★` : ""}
-            </p>
-          </div>
-          <div className="overflow-hidden rounded-none border border-white/10 bg-white text-foreground shadow-2xl">
-            {item.images ? (
-              <img
-                src={item.images}
-                alt={item.title}
-                className="aspect-[16/9] w-full object-cover"
-              />
-            ) : null}
-            <div className="space-y-3 p-4">
-              <p className="text-2xl font-bold text-violet-700">
-                {isFree ? "Miễn phí" : formatMoney(item.price, item.currency)}
-              </p>
-              {!isFree &&
-              Number.isFinite(compare) &&
-              compare > Number(item.price) ? (
-                <p className="text-sm text-muted-foreground line-through">
-                  {formatMoney(compare, item.currency)}
-                </p>
-              ) : null}
-              <a
-                href="/khoa-hoc"
-                className="inline-flex h-10 w-full items-center justify-center rounded-none bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600"
-              >
-                Quay lại danh sách
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const Course = () => (
   <Suspense fallback={<CourseFallback />}>
     <CourseView />
@@ -599,11 +527,13 @@ const CourseGrid = () => (
   </Suspense>
 );
 
-const CourseDetail = ({ slug }) => (
-  <Suspense fallback={<CourseFallback />}>
-    <CourseDetailView slug={slug} />
-  </Suspense>
-);
-
-export { getData, CourseGrid, CourseDetail };
+export {
+  getData,
+  CourseGrid,
+  CourseCard,
+  formatMoney,
+  formatDuration,
+  formatCount,
+  LEVELS,
+};
 export default Course;

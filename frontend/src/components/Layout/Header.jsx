@@ -34,6 +34,7 @@ import {
   onAuthChange,
   setPendingToast,
 } from "@/lib/auth";
+import { cartCount, loadCart, onCartChange } from "@/lib/cart";
 import { isAdmin, isInstructor, roleLabel } from "@/lib/roles";
 
 const NAV_ITEMS = [
@@ -118,7 +119,7 @@ function UserMenuLink({ href, children, count }) {
   );
 }
 
-function UserMenu({ user }) {
+function UserMenu({ user, cartItems = 0 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -188,7 +189,9 @@ function UserMenu({ user }) {
         <DropdownMenuSeparator />
         <UserMenuLink href="/hoc-tap">Học tập</UserMenuLink>
         <DropdownMenuSeparator />
-        <UserMenuLink href="/gio-hang">Giỏ hàng của tôi</UserMenuLink>
+        <UserMenuLink href="/gio-hang" count={cartItems}>
+          Giỏ hàng của tôi
+        </UserMenuLink>
         <UserMenuLink href="/danh-sach-mong-uoc">
           Danh sách mong ước
         </UserMenuLink>
@@ -227,16 +230,21 @@ const Header = () => {
   const [open, setOpen] = useState(false);
   const [path, setPath] = useState("/");
   const [user, setUser] = useState(null);
+  const [itemsInCart, setItemsInCart] = useState(0);
 
   useEffect(() => {
     setPath(window.location.pathname);
     setUser(getAuthUser());
+    setItemsInCart(cartCount());
     const unsubscribe = onAuthChange(setUser);
+    const stopCart = onCartChange(() => setItemsInCart(cartCount()));
+    loadCart().then(() => setItemsInCart(cartCount()));
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       unsubscribe();
+      stopCart();
       window.removeEventListener("scroll", onScroll);
     };
   }, []);
@@ -323,10 +331,15 @@ const Header = () => {
             )}
           >
             <ShoppingBag className="size-5" strokeWidth={1.75} />
+            {itemsInCart > 0 ? (
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-700 px-1 text-[10px] font-semibold text-white">
+                {itemsInCart > 9 ? "9+" : itemsInCart}
+              </span>
+            ) : null}
           </a>
 
           {user ? (
-            <UserMenu user={user} />
+            <UserMenu user={user} cartItems={itemsInCart} />
           ) : (
             <a
               href="/dang-nhap"

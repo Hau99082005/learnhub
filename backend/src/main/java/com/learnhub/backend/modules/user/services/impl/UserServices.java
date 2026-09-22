@@ -263,7 +263,8 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
                 resolveRole(account).name());
     }
 
-    private user requireAccount(String authorization) {
+    @Override
+    public user requireAccount(String authorization) {
         String token = extractToken(authorization);
         Long userId = sessions.findUserId(token);
         if (userId == null) {

@@ -14,6 +14,7 @@ import About from "@/components/About"
 import NewsPage from "@/news/page"
 import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
+import CartPage from "@/cart/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast } from "@/lib/auth"
 
@@ -92,6 +93,8 @@ function App() {
             <CoursePage />
           ) : path.startsWith("/khoa-hoc/") && path.split("/").filter(Boolean)[1] ? (
             <CoursePage slug={decodeURIComponent(path.split("/").filter(Boolean)[1])} />
+          ) : path === "/gio-hang" ? (
+            <CartPage />
           ) : path === "/gioi-thieu" ? (
             <About />
           ) : path === "/tin-tuc" || path.startsWith("/tin-tuc/") ? (

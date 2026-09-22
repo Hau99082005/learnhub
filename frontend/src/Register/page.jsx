@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { authRequest, saveAuth, setPendingToast } from "@/lib/auth";
+import { authRequest, saveAuth, setPendingToast, safeNextPath, withCurrentNext } from "@/lib/auth";
 import { ROLE_LABELS, ROLES } from "@/lib/roles";
 import { hasErrors, validateRegister } from "@/lib/validate";
 import {
@@ -66,7 +66,7 @@ const Page = () => {
       saveAuth(data);
       clearTeachStart();
       setPendingToast("success", "Đăng ký thành công");
-      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : "/";
+      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : safeNextPath("/");
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -83,7 +83,7 @@ const Page = () => {
       title="Đăng ký"
       description="Tạo tài khoản để bắt đầu học"
       switchText="Đã có tài khoản?"
-      switchHref={fromTeachFlow() ? "/dang-nhap?from=teach" : "/dang-nhap"}
+      switchHref={fromTeachFlow() ? "/dang-nhap?from=teach" : withCurrentNext("/dang-nhap")}
       switchLabel="Đăng nhập"
     >
       <form noValidate onSubmit={onSubmit} className="mt-6 grid gap-4">
@@ -228,7 +228,7 @@ const Page = () => {
         redirectTo={
           fromTeachFlow() || values.role === ROLES.INSTRUCTOR
             ? INSTRUCTOR_STUDIO
-            : "/"
+            : safeNextPath("/")
         }
         onBeforeGoogle={() => (agree ? "" : "Vui lòng đồng ý với điều khoản")}
       />

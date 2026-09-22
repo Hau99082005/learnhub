@@ -1,4 +1,5 @@
-const CART_KEY = "learnhub_cart";
+import { isInCart } from "@/lib/cart";
+
 const OWNED_KEY = "learnhub_owned";
 
 function readIds(key) {
@@ -16,24 +17,12 @@ function writeIds(key, ids) {
   localStorage.setItem(key, JSON.stringify([...new Set(ids)]));
 }
 
-function addId(key, course) {
+export function addOwned(course) {
   const id = Number(course?.id ?? course);
   if (!Number.isFinite(id)) {
     return;
   }
-  writeIds(key, [...readIds(key), id]);
-}
-
-export function addToCart(course) {
-  addId(CART_KEY, course);
-}
-
-export function isInCart(id) {
-  return readIds(CART_KEY).includes(Number(id));
-}
-
-export function addOwned(course) {
-  addId(OWNED_KEY, course);
+  writeIds(OWNED_KEY, [...readIds(OWNED_KEY), id]);
 }
 
 export function isOwned(id) {
@@ -43,3 +32,5 @@ export function isOwned(id) {
 export function canAccessCourse(id) {
   return isOwned(id) || isInCart(id);
 }
+
+export { isInCart };

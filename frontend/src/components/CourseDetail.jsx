@@ -1,4 +1,4 @@
-import { Suspense, use, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
 import {
   Award,
   BookOpen,
@@ -27,11 +27,12 @@ import {
 import { cn } from "@/lib/utils";
 import {
   addOwned,
-  addToCart,
   canAccessCourse,
   isInCart,
   isOwned,
 } from "@/lib/courseAccess";
+import { addCourseToCart, loadCart, onCartChange } from "@/lib/cart";
+import { getAuthUser } from "@/lib/auth";
 
 const LANG = { vi: "Tiếng Việt", en: "English" };
 
@@ -212,9 +213,8 @@ function Curriculum({ item, unlocked }) {
                 <ul className="bg-background">
                   {lessons.map((lesson) => {
                     const isPreview = previewIds.has(lesson.id);
-                    const canPlay = Boolean(
-                      lesson.videoUrl && (unlocked || isPreview),
-                    );
+                    const allowed = Boolean(unlocked || isPreview);
+                    const canPlay = Boolean(allowed && lesson.videoUrl);
                     const playing = playingId === lesson.id && canPlay;
                     return (
                       <li key={lesson.id} className="border-t border-border">
@@ -226,13 +226,16 @@ function Curriculum({ item, unlocked }) {
                               setPlayingId(playing ? null : lesson.id);
                               return;
                             }
+                            if (allowed) {
+                              return;
+                            }
                             toast.error(
                               "Thêm vào giỏ hàng hoặc mua khóa học để xem bài giảng này",
                             );
                           }}
                         >
                           <span className="inline-flex min-w-0 items-center gap-2">
-                            {canPlay ? (
+                            {allowed ? (
                               <Play className="size-4 shrink-0 text-muted-foreground" />
                             ) : (
                               <Lock className="size-4 shrink-0 text-muted-foreground" />
@@ -363,7 +366,15 @@ function PurchaseCard({ item, onAccessChange }) {
   const off = discountOf(item.price, item.compareAtPrice);
   const duration = formatDuration(item.durationSeconds);
   const owned = isOwned(item.id);
-  const inCart = isInCart(item.id);
+  const [inCart, setInCart] = useState(() => isInCart(item.id));
+  const [adding, setAdding] = useState(false);
+  const [buying, setBuying] = useState(false);
+
+  useEffect(() => {
+    const stop = onCartChange(() => setInCart(isInCart(item.id)));
+    setInCart(isInCart(item.id));
+    return stop;
+  }, [item.id]);
 
   return (
     <div className="overflow-hidden border border-border bg-background text-foreground shadow-[0_12px_40px_-16px_rgba(0,0,0,0.45)]">
@@ -422,12 +433,15 @@ function PurchaseCard({ item, onAccessChange }) {
         </div>
         <button
           type="button"
-          disabled={owned || inCart}
+          disabled={owned || inCart || adding}
           className="inline-flex h-11 w-full items-center justify-center gap-1.5 bg-violet-700 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-70"
-          onClick={() => {
-            addToCart(item);
-            onAccessChange?.();
-            toast.success(`Đã thêm “${item.title}” vào giỏ hàng`);
+          onClick={async () => {
+            setAdding(true);
+            const ok = await addCourseToCart(item);
+            setAdding(false);
+            if (ok) {
+              onAccessChange?.();
+            }
           }}
           style={{
             fontFamily: "'Roboto', sans-serif",
@@ -441,19 +455,32 @@ function PurchaseCard({ item, onAccessChange }) {
           }}
         >
           <ShoppingBag className="size-4" />
-          {owned ? "Đã sở hữu" : inCart ? "Đã thêm vào giỏ hàng" : "Thêm vào giỏ hàng"}
+          {owned
+            ? "Đã sở hữu"
+            : inCart
+              ? "Đã thêm vào giỏ hàng"
+              : adding
+                ? "Đang thêm..."
+                : "Thêm vào giỏ hàng"}
         </button>
         <button
           type="button"
-          disabled={owned}
+          disabled={owned || buying}
           className="inline-flex h-11 w-full items-center justify-center border border-foreground/20 bg-background text-sm font-semibold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-          onClick={() => {
+          onClick={async () => {
+            if (!getAuthUser()) {
+              toast.error("Vui lòng đăng nhập hoặc đăng ký để mua khóa học");
+              return;
+            }
+            setBuying(true);
+            const ok = await addCourseToCart(item);
+            setBuying(false);
+            if (!ok) {
+              return;
+            }
             addOwned(item);
-            addToCart(item);
             onAccessChange?.();
-            toast.success(
-              isFree ? "Đăng ký khóa học thành công" : "Mua khóa học thành công",
-            );
+            window.location.href = "/gio-hang";
           }}
           style={{
             fontFamily: "'Roboto', sans-serif",
@@ -556,6 +583,12 @@ function CourseDetailView({ slug }) {
   const [accessKey, setAccessKey] = useState(0);
   const unlocked = canAccessCourse(item?.id);
   void accessKey;
+
+  useEffect(() => {
+    const stop = onCartChange(() => setAccessKey((value) => value + 1));
+    loadCart().then(() => setAccessKey((value) => value + 1));
+    return stop;
+  }, []);
 
   if (!item) {
     return (

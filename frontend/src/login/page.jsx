@@ -7,7 +7,7 @@ import SocialAuth from "@/components/auth/SocialAuth";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { authPost, authRequest, saveAuth, setPendingToast, updateAuthUser } from "@/lib/auth";
+import { authPost, authRequest, saveAuth, setPendingToast, safeNextPath, withCurrentNext, updateAuthUser } from "@/lib/auth";
 import { hasErrors, validateLogin } from "@/lib/validate";
 import {
   INSTRUCTOR_STUDIO,
@@ -57,7 +57,7 @@ const Page = () => {
         clearTeachStart();
       }
       setPendingToast("success", "Đăng nhập thành công");
-      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : "/";
+      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : safeNextPath("/");
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -74,7 +74,7 @@ const Page = () => {
       title="Đăng nhập"
       description="Chào mừng bạn quay lại LearnHub"
       switchText="Chưa có tài khoản?"
-      switchHref={fromTeachFlow() ? "/dang-ky?role=INSTRUCTOR&from=teach" : "/dang-ky"}
+      switchHref={fromTeachFlow() ? "/dang-ky?role=INSTRUCTOR&from=teach" : withCurrentNext("/dang-ky")}
       switchLabel="Đăng ký"
     >
       <form noValidate onSubmit={onSubmit} className="mt-6 grid gap-4">
@@ -158,7 +158,7 @@ const Page = () => {
       </form>
       <SocialAuth
         extraBody={readTeachStartAnswers() || {}}
-        redirectTo={fromTeachFlow() || readTeachStartAnswers() ? INSTRUCTOR_STUDIO : "/"}
+        redirectTo={fromTeachFlow() || readTeachStartAnswers() ? INSTRUCTOR_STUDIO : safeNextPath("/")}
       />
     </AuthLayout>
   );

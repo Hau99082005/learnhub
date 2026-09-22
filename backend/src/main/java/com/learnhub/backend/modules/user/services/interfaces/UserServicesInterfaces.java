@@ -6,6 +6,7 @@ import com.learnhub.backend.modules.user.dtos.LoginReponse;
 import com.learnhub.backend.modules.user.dtos.LoginRequest;
 import com.learnhub.backend.modules.user.dtos.RegisterRequest;
 import com.learnhub.backend.modules.user.dtos.userDTO;
+import com.learnhub.backend.modules.user.models.user;
 
 public interface UserServicesInterfaces {
     LoginReponse login(LoginRequest request);
@@ -19,4 +20,6 @@ public interface UserServicesInterfaces {
     userDTO me(String authorization);
 
     userDTO requireAdmin(String authorization);
+
+    user requireAccount(String authorization);
 }

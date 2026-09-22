@@ -1,4 +1,4 @@
-import { Suspense, use, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,7 +8,6 @@ import {
   ShoppingBag,
   Star,
 } from "lucide-react";
-import { toast } from "sonner";
 import {
   Carousel,
   CarouselContent,
@@ -16,7 +15,8 @@ import {
   useCarousel,
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
-import { addToCart, isInCart, isOwned } from "@/lib/courseAccess";
+import { addCourseToCart, isInCart, onCartChange } from "@/lib/cart";
+import { isOwned } from "@/lib/courseAccess";
 
 let coursesPromise;
 
@@ -69,7 +69,14 @@ function formatCount(value) {
 
 function CourseCard({ item, wished, onWish }) {
   const [inCart, setInCart] = useState(() => isInCart(item.id));
+  const [adding, setAdding] = useState(false);
   const owned = isOwned(item.id);
+
+  useEffect(() => {
+    const stop = onCartChange(() => setInCart(isInCart(item.id)));
+    setInCart(isInCart(item.id));
+    return stop;
+  }, [item.id]);
   const rating = Number(item.ratingAvg) || 0;
   const ratingCount = Number(item.ratingCount) || 0;
   const enrolled = Number(item.enrolledCount) || 0;
@@ -278,12 +285,15 @@ function CourseCard({ item, wished, onWish }) {
         <button
           type="button"
           className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-none bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-70"
-          disabled={owned || inCart}
-          onClick={(event) => {
+          disabled={owned || inCart || adding}
+          onClick={async (event) => {
             event.preventDefault();
-            addToCart(item);
-            setInCart(true);
-            toast.success(`Đã thêm “${item.title}” vào giỏ hàng`);
+            setAdding(true);
+            const ok = await addCourseToCart(item);
+            setAdding(false);
+            if (ok) {
+              setInCart(true);
+            }
           }}
           style={{
             fontFamily: "'Roboto', sans-serif",
@@ -297,7 +307,13 @@ function CourseCard({ item, wished, onWish }) {
           }}
         >
           <ShoppingBag className="size-4" />
-          {owned ? "Đã sở hữu" : inCart ? "Đã thêm vào giỏ" : "Thêm vào giỏ hàng"}
+          {owned
+            ? "Đã sở hữu"
+            : inCart
+              ? "Đã thêm vào giỏ"
+              : adding
+                ? "Đang thêm..."
+                : "Thêm vào giỏ hàng"}
         </button>
       </div>
     </article>

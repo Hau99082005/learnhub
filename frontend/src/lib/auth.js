@@ -171,6 +171,35 @@ export function setPendingToast(type, message) {
   sessionStorage.setItem(TOAST_KEY, JSON.stringify({ type, message }))
 }
 
+export function safeNextPath(fallback = "/") {
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (
+    next &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.startsWith("/dang-nhap") &&
+    !next.startsWith("/dang-ky")
+  ) {
+    return next;
+  }
+  return fallback;
+}
+
+export function withCurrentNext(path) {
+  const next = new URLSearchParams(window.location.search).get("next");
+  const url = new URL(path, window.location.origin);
+  if (
+    next &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.startsWith("/dang-nhap") &&
+    !next.startsWith("/dang-ky")
+  ) {
+    url.searchParams.set("next", next);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 export function consumePendingToast() {
   const raw = sessionStorage.getItem(TOAST_KEY)
   sessionStorage.removeItem(TOAST_KEY)

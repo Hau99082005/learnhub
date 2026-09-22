@@ -275,8 +275,8 @@ const CartPage = () => {
             >
               {formatMoney(cart.subtotal, cart.currency)}
             </p>
-            <button
-              type="button"
+            <a
+              href="/thanh-toan"
               className="mt-4 inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600"
               style={{
                 fontFamily: "'Roboto', sans-serif",
@@ -288,14 +288,9 @@ const CartPage = () => {
                 border: "none",
                 borderRadius: "5px",
               }}
-              onClick={() =>
-                toast.success(
-                  "Giỏ hàng đã sẵn sàng. Thanh toán sẽ được mở ở bước tiếp theo.",
-                )
-              }
             >
               Thanh toán
-            </button>
+            </a>
             <p
               className="mt-3 text-center text-xs text-muted-foreground"
               style={{

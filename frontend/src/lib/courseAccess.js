@@ -25,6 +25,13 @@ export function addOwned(course) {
   writeIds(OWNED_KEY, [...readIds(OWNED_KEY), id]);
 }
 
+export function addOwnedMany(ids) {
+  const next = (Array.isArray(ids) ? ids : [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+  writeIds(OWNED_KEY, [...readIds(OWNED_KEY), ...next]);
+}
+
 export function isOwned(id) {
   return readIds(OWNED_KEY).includes(Number(id));
 }

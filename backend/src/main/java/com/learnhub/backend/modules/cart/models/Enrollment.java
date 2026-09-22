@@ -20,6 +20,12 @@ public class Enrollment {
     @Column(name = "course_id", nullable = false)
     private Long courseId;
 
+    @Column(name = "order_id")
+    private Long orderId;
+
+    @Column(nullable = false, length = 20)
+    private String source = "PURCHASE";
+
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
@@ -45,6 +51,22 @@ public class Enrollment {
 
     public void setCourseId(Long courseId) {
         this.courseId = courseId;
+    }
+
+    public Long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     public String getStatus() {

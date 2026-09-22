@@ -110,11 +110,24 @@ const CartPage = () => {
         style={{
           fontFamily: "'Roboto', sans-serif",
           letterSpacing: "0.01em",
+          fontSize: "32px",
+          fontStyle: "normal",
+          lineHeight: 1.4,
         }}
       >
         Giỏ hàng
         {count > 0 ? (
-          <span className="ml-2 text-lg font-medium text-muted-foreground sm:text-xl">
+          <span
+            className="ml-2 text-lg font-medium text-muted-foreground sm:text-xl"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              letterSpacing: "0.01em",
+              fontSize: "16px",
+              fontStyle: "normal",
+              fontWeight: "400",
+              lineHeight: 1.6,
+            }}
+          >
             ({count} khóa học)
           </span>
         ) : null}
@@ -123,7 +136,9 @@ const CartPage = () => {
       {items.length === 0 ? (
         <div className="mt-8 border border-border px-4 py-12 text-center sm:px-8">
           <ShoppingBag className="mx-auto size-10 text-muted-foreground" />
-          <p className="mt-4 text-base font-medium">Giỏ hàng của bạn đang trống</p>
+          <p className="mt-4 text-base font-medium">
+            Giỏ hàng của bạn đang trống
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Duyệt khóa học và thêm những nội dung bạn muốn học.
           </p>
@@ -163,10 +178,31 @@ const CartPage = () => {
                     )}
                   </a>
                   <div className="min-w-0 flex-1">
-                    <a href={href} className="block text-base font-semibold leading-snug hover:text-violet-700">
+                    <a
+                      href={href}
+                      className="block text-base font-semibold leading-snug hover:text-violet-700"
+                      style={{
+                        fontFamily: "'Roboto', sans-serif",
+                        letterSpacing: "0.01em",
+                        fontSize: "18px",
+                        fontStyle: "normal",
+                        fontWeight: "500",
+                        lineHeight: 1.6,
+                      }}
+                    >
                       {item.title}
                     </a>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p
+                      className="mt-1 text-sm text-muted-foreground"
+                      style={{
+                        fontFamily: "'Roboto', sans-serif",
+                        letterSpacing: "0.01em",
+                        fontSize: "16px",
+                        fontStyle: "normal",
+                        fontWeight: "400",
+                        lineHeight: 1.6,
+                      }}
+                    >
                       {item.instructorName || "Giảng viên LearnHub"}
                       {formatDuration(item.durationSeconds)
                         ? ` · ${formatDuration(item.durationSeconds)}`
@@ -176,6 +212,14 @@ const CartPage = () => {
                       type="button"
                       disabled={busy}
                       onClick={() => removeItem(item)}
+                      style={{
+                        fontFamily: "'Roboto', sans-serif",
+                        letterSpacing: "0.01em",
+                        fontSize: "14px",
+                        fontStyle: "normal",
+                        fontWeight: "400",
+                        lineHeight: 1.6,
+                      }}
                       className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition hover:text-destructive disabled:opacity-60"
                     >
                       <Trash2 className="size-4" />
@@ -186,6 +230,14 @@ const CartPage = () => {
                     className={cn(
                       "shrink-0 text-base font-semibold text-violet-700 sm:text-right",
                     )}
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      letterSpacing: "0.01em",
+                      fontSize: "20px",
+                      fontStyle: "normal",
+                      fontWeight: "700",
+                      lineHeight: 1.4,
+                    }}
                   >
                     {item.isFree || Number(item.unitPrice) <= 0
                       ? "Miễn phí"
@@ -197,24 +249,64 @@ const CartPage = () => {
           </ul>
 
           <aside className="border border-border p-4 sm:p-5 lg:sticky lg:top-24">
-            <p className="text-sm text-muted-foreground">Tổng cộng:</p>
             <p
-              className="mt-1 text-2xl font-bold text-violet-700"
-              style={{ letterSpacing: "0.01em" }}
+              className="text-sm text-muted-foreground"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                letterSpacing: "0.01em",
+                fontSize: "16px",
+                fontStyle: "normal",
+                fontWeight: "400",
+                lineHeight: 1.6,
+              }}
+            >
+              Tổng cộng:
+            </p>
+            <p
+              className="mt-1 text-2xl font-bold hover:text-violet-700"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                letterSpacing: "0.01em",
+                fontSize: "28px",
+                fontStyle: "normal",
+                fontWeight: "700",
+                lineHeight: 1.6,
+              }}
             >
               {formatMoney(cart.subtotal, cart.currency)}
             </p>
             <button
               type="button"
               className="mt-4 inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600"
-              style={{ borderRadius: "5px" }}
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                letterSpacing: "0.01em",
+                fontSize: "18px",
+                fontStyle: "normal",
+                fontWeight: "500",
+                lineHeight: 1.6,
+                border: "none",
+                borderRadius: "5px",
+              }}
               onClick={() =>
-                toast.success("Giỏ hàng đã sẵn sàng. Thanh toán sẽ được mở ở bước tiếp theo.")
+                toast.success(
+                  "Giỏ hàng đã sẵn sàng. Thanh toán sẽ được mở ở bước tiếp theo.",
+                )
               }
             >
               Thanh toán
             </button>
-            <p className="mt-3 text-center text-xs text-muted-foreground">
+            <p
+              className="mt-3 text-center text-xs text-muted-foreground"
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                letterSpacing: "0.01em",
+                fontSize: "14px",
+                fontStyle: "italic",
+                fontWeight: "400",
+                lineHeight: 1.6,
+              }}
+            >
               Đảm bảo hoàn tiền trong 30 ngày
             </p>
           </aside>

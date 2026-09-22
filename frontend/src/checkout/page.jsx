@@ -7,25 +7,28 @@ import { confirmCheckout, createCheckout, getCheckout } from "@/lib/checkout";
 import { addOwnedMany } from "@/lib/courseAccess";
 import { getCart, loadCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
+import vnpayLogo from "@/assets/images/Icon-VNPAY-QR.webp";
+import momoLogo from "@/assets/images/MoMo_Logo_App.svg.webp";
+import bankLogo from "@/assets/images/png-clipart-bank-transfer-logo-wire-transfer-electronic-funds-transfer-bank-payment-computer-icons-bank-text-rectangle.png";
 
 const METHODS = [
   {
     id: "VNPAY",
     name: "VNPay",
     hint: "ATM, QR, thẻ nội địa và quốc tế",
-    tone: "bg-[#0055AA]",
+    logo: vnpayLogo,
   },
   {
     id: "MOMO",
     name: "MoMo",
     hint: "Thanh toán nhanh bằng ví MoMo",
-    tone: "bg-[#D82D8B]",
+    logo: momoLogo,
   },
   {
     id: "BANK_TRANSFER",
     name: "Chuyển khoản ngân hàng",
     hint: "Chuyển khoản đúng nội dung đơn hàng",
-    tone: "bg-emerald-700",
+    logo: bankLogo,
   },
 ];
 
@@ -216,12 +219,16 @@ function MethodPicker({ selected, onSelect }) {
           >
             <span
               className={cn(
-                "flex h-10 w-14 shrink-0 items-center justify-center text-[11px] font-bold text-white",
-                method.tone,
+                "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden sm:h-11 sm:w-11",
+                method.id === "MOMO" ? "bg-transparent" : "bg-white",
               )}
-              style={{ borderRadius: "5px" }}
+              style={{ borderRadius: method.id === "MOMO" ? "10px" : "5px" }}
             >
-              {method.id === "BANK_TRANSFER" ? "BANK" : method.name}
+              <img
+                src={method.logo}
+                alt=""
+                className="size-full object-contain"
+              />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">{method.name}</span>

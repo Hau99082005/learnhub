@@ -31,7 +31,9 @@ const METHODS = [
 
 function orderCodeFromPath() {
   const parts = window.location.pathname.split("/").filter(Boolean);
-  return parts[0] === "thanh-toan" && parts[1] ? decodeURIComponent(parts[1]) : "";
+  return parts[0] === "thanh-toan" && parts[1]
+    ? decodeURIComponent(parts[1])
+    : "";
 }
 
 function loginHref() {
@@ -63,7 +65,13 @@ function AuthGate() {
     <section className="mx-auto w-full max-w-5xl px-3 py-10 sm:px-6 sm:py-14">
       <h1
         className="text-2xl font-bold tracking-tight sm:text-3xl"
-        style={{ ...fieldStyle, fontSize: "32px", lineHeight: 1.4 }}
+        style={{
+          ...fieldStyle,
+          fontSize: "40px",
+          lineHeight: 1.4,
+          fontWeight: "700",
+          letterSpacing: "0.01em",
+        }}
       >
         Thanh toán
       </h1>
@@ -96,7 +104,17 @@ function AuthGate() {
 function Summary({ items, total, currency }) {
   return (
     <aside className="border border-border p-4 sm:p-5 lg:sticky lg:top-24">
-      <p className="text-sm font-medium" style={fieldStyle}>
+      <p
+        className="text-sm font-medium"
+        style={{
+          fontFamily: "'Roboto', sans-serif",
+          fontSize: "18px",
+          fontStyle: "normal",
+          fontWeight: "700",
+          lineHeight: 1.4,
+          letterSpacing: "0.01em",
+        }}
+      >
         Đơn hàng
       </p>
       <ul className="mt-3 space-y-3">
@@ -104,7 +122,11 @@ function Summary({ items, total, currency }) {
           <li key={item.courseId || item.slug} className="flex gap-3">
             <div className="size-14 shrink-0 overflow-hidden bg-muted sm:size-16">
               {item.images ? (
-                <img src={item.images} alt="" className="size-full object-cover" />
+                <img
+                  src={item.images}
+                  alt=""
+                  className="size-full object-cover"
+                />
               ) : (
                 <span className="flex size-full items-center justify-center text-muted-foreground">
                   <ShoppingBag className="size-5" />
@@ -112,8 +134,30 @@ function Summary({ items, total, currency }) {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-sm font-medium leading-snug">{item.title}</p>
-              <p className="mt-1 text-sm font-semibold text-violet-700">
+              <p
+                className="line-clamp-2 text-sm font-medium leading-snug"
+                style={{
+                  fontFamily: "'Roboto', sans-serif",
+                  fontSize: "13px",
+                  fontWeight: "500",
+                  fontStyle: "normal",
+                  lineHeight: 1.5,
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {item.title}
+              </p>
+              <p
+                className="mt-1 text-sm font-semibold text-violet-400 hover:text-violet-800"
+                style={{
+                  fontFamily: "'Roboto', sans-serif",
+                  fontSize: "13px",
+                  fontWeight: "700",
+                  fontStyle: "normal",
+                  lineHeight: 1.5,
+                  letterSpacing: "0.01em",
+                }}
+              >
                 {Number(item.unitPrice) <= 0
                   ? "Miễn phí"
                   : formatMoney(item.unitPrice, currency)}
@@ -123,10 +167,27 @@ function Summary({ items, total, currency }) {
         ))}
       </ul>
       <div className="mt-4 border-t border-border pt-4">
-        <p className="text-sm text-muted-foreground">Tổng cộng</p>
         <p
-          className="mt-1 text-2xl font-bold"
-          style={{ ...fieldStyle, fontSize: "28px", fontWeight: 700, lineHeight: 1.4 }}
+          className="text-sm text-muted-foreground"
+          style={{
+            fontFamily: "'Roboto', sans-serif",
+            fontSize: "16px",
+            fontWeight: "400",
+            fontStyle: "normal",
+            lineHeight: 1.4,
+            letterSpacing: "0.01em",
+          }}
+        >
+          Tổng cộng
+        </p>
+        <p
+          className="mt-1 text-2xl font-bold hover:text-violet-700"
+          style={{
+            ...fieldStyle,
+            fontSize: "32px",
+            fontWeight: 700,
+            lineHeight: 1.4,
+          }}
         >
           {formatMoney(total, currency)}
         </p>
@@ -189,7 +250,9 @@ function PayGuide({ order }) {
   if (order.status === "PAID") {
     return (
       <div className="border border-emerald-600/40 bg-emerald-600/10 px-4 py-5">
-        <p className="text-base font-semibold text-emerald-500">Thanh toán thành công</p>
+        <p className="text-base font-semibold text-emerald-500">
+          Thanh toán thành công
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
           Bạn đã sở hữu khóa học trong đơn {order.orderCode}.
         </p>
@@ -215,7 +278,8 @@ function PayGuide({ order }) {
       <div className="space-y-3 border border-border p-4 sm:p-5">
         <p className="font-semibold">Chuyển khoản ngân hàng</p>
         <p className="text-sm text-muted-foreground">
-          Vui lòng chuyển đúng số tiền và nội dung để hệ thống ghi nhận đơn hàng.
+          Vui lòng chuyển đúng số tiền và nội dung để hệ thống ghi nhận đơn
+          hàng.
         </p>
         <dl className="space-y-2">
           {rows.map(([label, value]) => (
@@ -224,7 +288,9 @@ function PayGuide({ order }) {
               className="flex flex-col gap-1 border border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
               style={{ borderRadius: "5px" }}
             >
-              <dt className="text-xs text-muted-foreground sm:text-sm">{label}</dt>
+              <dt className="text-xs text-muted-foreground sm:text-sm">
+                {label}
+              </dt>
               <dd className="flex items-center justify-between gap-3 sm:justify-end">
                 <span className="text-sm font-semibold">{value}</span>
                 <button
@@ -244,7 +310,9 @@ function PayGuide({ order }) {
   const momo = order.provider === "MOMO";
   return (
     <div className="space-y-3 border border-border p-4 sm:p-5">
-      <p className="font-semibold">{momo ? "Thanh toán MoMo" : "Thanh toán VNPay"}</p>
+      <p className="font-semibold">
+        {momo ? "Thanh toán MoMo" : "Thanh toán VNPay"}
+      </p>
       <p className="text-sm text-muted-foreground">
         {momo
           ? "Mở ứng dụng MoMo, chọn thanh toán và nhập mã đơn hàng bên dưới."
@@ -257,8 +325,12 @@ function PayGuide({ order }) {
         )}
         style={{ borderRadius: "5px" }}
       >
-        <span className="text-xs uppercase tracking-wide opacity-80">Mã đơn</span>
-        <span className="px-3 text-center text-lg font-bold">{order.orderCode}</span>
+        <span className="text-xs uppercase tracking-wide opacity-80">
+          Mã đơn
+        </span>
+        <span className="px-3 text-center text-lg font-bold">
+          {order.orderCode}
+        </span>
         <span className="text-sm font-semibold">
           {formatMoney(order.totalAmount, order.currency)}
         </span>
@@ -305,11 +377,16 @@ function CheckoutStart() {
   if (!items.length) {
     return (
       <section className="mx-auto w-full max-w-5xl px-3 py-10 sm:px-6 sm:py-14">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl" style={fieldStyle}>
+        <h1
+          className="text-2xl font-bold tracking-tight sm:text-3xl"
+          style={fieldStyle}
+        >
           Thanh toán
         </h1>
         <div className="mt-6 border border-border px-4 py-12 text-center">
-          <p className="font-medium">Giỏ hàng trống, chưa có gì để thanh toán</p>
+          <p className="font-medium">
+            Giỏ hàng trống, chưa có gì để thanh toán
+          </p>
           <a
             href="/gio-hang"
             className="mt-6 inline-flex h-11 items-center justify-center bg-violet-700 px-6 text-sm font-medium text-white"
@@ -326,14 +403,43 @@ function CheckoutStart() {
     <section className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 sm:py-12">
       <h1
         className="text-2xl font-bold tracking-tight sm:text-3xl"
-        style={{ ...fieldStyle, fontSize: "32px", lineHeight: 1.4 }}
+        style={{
+          ...fieldStyle,
+          fontSize: "36px",
+          lineHeight: 1.4,
+          fontStyle: "normal",
+          fontWeight: "700",
+          letterSpacing: "0.01em",
+        }}
       >
         Thanh toán
       </h1>
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="border border-border p-4 sm:p-5">
-          <h2 className="text-base font-semibold sm:text-lg">Chọn phương thức thanh toán</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2
+            className="text-base font-semibold sm:text-lg"
+            style={{
+              ...fieldStyle,
+              fontSize: "24px",
+              lineHeight: 1.4,
+              fontStyle: "normal",
+              fontWeight: "700",
+              letterSpacing: "0.01em",
+            }}
+          >
+            Chọn phương thức thanh toán
+          </h2>
+          <p
+            className="mt-1 text-sm text-muted-foreground"
+            style={{
+              ...fieldStyle,
+              fontSize: "16px",
+              lineHeight: 1.4,
+              fontStyle: "italic",
+              fontWeight: "400",
+              letterSpacing: "0.01em",
+            }}
+          >
             VNPay, MoMo hoặc chuyển khoản ngân hàng.
           </p>
           <div className="mt-4">
@@ -344,11 +450,29 @@ function CheckoutStart() {
             disabled={submitting}
             onClick={submit}
             className="mt-5 inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 disabled:opacity-70 sm:w-auto sm:px-8"
-            style={{ border: "none", borderRadius: "5px" }}
+            style={{
+              border: "none",
+              borderRadius: "5px",
+              fontSize: "18px",
+              fontWeight: "500",
+              fontStyle: "normal",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+            }}
           >
             {submitting ? "Đang tạo đơn..." : "Tiếp tục thanh toán"}
           </button>
-          <p className="mt-3 text-center text-xs text-muted-foreground italic sm:text-left">
+          <p
+            className="mt-3 text-center text-xs text-muted-foreground italic sm:text-left"
+            style={{
+              ...fieldStyle,
+              fontSize: "14px",
+              lineHeight: 1.4,
+              fontStyle: "italic",
+              fontWeight: "400",
+              letterSpacing: "0.01em",
+            }}
+          >
             Đảm bảo hoàn tiền trong 30 ngày
           </p>
         </div>
@@ -389,7 +513,10 @@ function CheckoutOrder({ orderCode }) {
       <section className="mx-auto w-full max-w-5xl px-3 py-10 sm:px-6">
         <h1 className="text-2xl font-bold">Thanh toán</h1>
         <p className="mt-4 text-sm text-destructive">{error}</p>
-        <a href="/gio-hang" className="mt-4 inline-block text-sm text-violet-700 hover:underline">
+        <a
+          href="/gio-hang"
+          className="mt-4 inline-block text-sm text-violet-700 hover:underline"
+        >
           Quay lại giỏ hàng
         </a>
       </section>

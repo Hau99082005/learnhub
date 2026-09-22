@@ -7,7 +7,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -49,5 +48,14 @@ public class BaseController {
             throw new RuntimeException("Lỗi lấy dữ liệu courses: " + e.getMessage());
         }
     }
+    @GetMapping("/carts")
+    public List<Map<String, Object>> getCarts() {
+        try {
+            return jdbcTemplate.queryForList("SELECT * FROM carts");
 
+        }catch(DataAccessException e) {
+          throw new RuntimeException("Lỗi lấy dữ liệu carts: "+ e.getMessage());
+        }
+    }
+    
 }

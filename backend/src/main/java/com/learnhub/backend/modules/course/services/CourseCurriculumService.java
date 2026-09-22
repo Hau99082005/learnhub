@@ -272,7 +272,7 @@ public class CourseCurriculumService {
                 lesson.getSortOrder(),
                 preview,
                 on(lesson.getIsPublished()),
-                admin || preview ? videoUrl : null);
+                videoUrl);
     }
 
     private MediaAsset createMedia(Long uploadedBy, LessonRequest request, String videoUrl, int duration) {

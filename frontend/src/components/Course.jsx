@@ -16,6 +16,7 @@ import {
   useCarousel,
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
+import { addToCart, isInCart, isOwned } from "@/lib/courseAccess";
 
 let coursesPromise;
 
@@ -67,6 +68,8 @@ function formatCount(value) {
 }
 
 function CourseCard({ item, wished, onWish }) {
+  const [inCart, setInCart] = useState(() => isInCart(item.id));
+  const owned = isOwned(item.id);
   const rating = Number(item.ratingAvg) || 0;
   const ratingCount = Number(item.ratingCount) || 0;
   const enrolled = Number(item.enrolledCount) || 0;
@@ -274,9 +277,12 @@ function CourseCard({ item, wished, onWish }) {
         </div>
         <button
           type="button"
-          className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-none bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 active:translate-y-px"
+          className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-none bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-70"
+          disabled={owned || inCart}
           onClick={(event) => {
             event.preventDefault();
+            addToCart(item);
+            setInCart(true);
             toast.success(`Đã thêm “${item.title}” vào giỏ hàng`);
           }}
           style={{
@@ -291,7 +297,7 @@ function CourseCard({ item, wished, onWish }) {
           }}
         >
           <ShoppingBag className="size-4" />
-          Thêm vào giỏ hàng
+          {owned ? "Đã sở hữu" : inCart ? "Đã thêm vào giỏ" : "Thêm vào giỏ hàng"}
         </button>
       </div>
     </article>

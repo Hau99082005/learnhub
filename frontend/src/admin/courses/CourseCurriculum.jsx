@@ -49,6 +49,19 @@ function formatClock(seconds) {
   return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
+function isVideoFile(file) {
+  return (
+    file?.type?.startsWith("video/") ||
+    /\.(mp4|webm|mov|mkv|avi)$/i.test(file?.name || "")
+  );
+}
+
+function sortVideoFiles(files) {
+  return [...files].sort((a, b) =>
+    a.name.localeCompare(b.name, "vi", { numeric: true, sensitivity: "base" }),
+  );
+}
+
 function fileTitle(file) {
   if (!file?.name) {
     return "";
@@ -66,8 +79,7 @@ function CourseCurriculum({ course, onBack }) {
   const [openIds, setOpenIds] = useState([]);
   const [lessonTitle, setLessonTitle] = useState({});
   const [lessonPreview, setLessonPreview] = useState({});
-  const [lessonFile, setLessonFile] = useState({});
-  const [lessonReady, setLessonReady] = useState({});
+  const [lessonFiles, setLessonFiles] = useState({});
   const [progress, setProgress] = useState({});
   const [uploading, setUploading] = useState({});
   const [playingId, setPlayingId] = useState(null);
@@ -103,8 +115,7 @@ function CourseCurriculum({ course, onBack }) {
     setEditingId(null);
     setLessonTitle({});
     setLessonPreview({});
-    setLessonFile({});
-    setLessonReady({});
+    setLessonFiles({});
     setProgress({});
     setUploading({});
     setPlayingId(null);
@@ -182,99 +193,102 @@ function CourseCurriculum({ course, onBack }) {
     }
   };
 
-  const onPickLessonFile = (sectionId, event) => {
-    const next = event.target.files?.[0];
+  const onPickLessonFiles = (sectionId, event) => {
+    const picked = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!next) {
-      return;
-    }
-    if (
-      !next.type.startsWith("video/") &&
-      !/\.(mp4|webm|mov|mkv|avi)$/i.test(next.name)
-    ) {
+    const videos = picked.filter(isVideoFile);
+    if (!videos.length) {
       toast.error("Vui lòng chọn file video");
       return;
     }
-    setLessonFile((prev) => ({ ...prev, [sectionId]: next }));
-    setLessonReady((prev) => ({ ...prev, [sectionId]: null }));
+    const merged = sortVideoFiles([
+      ...(lessonFiles[sectionId] || []),
+      ...videos,
+    ]);
+    const unique = [];
+    const seen = new Set();
+    for (const file of merged) {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      unique.push(file);
+    }
+    setLessonFiles((prev) => ({ ...prev, [sectionId]: unique }));
     setProgress((prev) => ({ ...prev, [sectionId]: 0 }));
-    setLessonTitle((prev) => ({
-      ...prev,
-      [sectionId]: prev[sectionId] || fileTitle(next),
-    }));
-    const url = URL.createObjectURL(next);
-    const player = document.createElement("video");
-    player.preload = "metadata";
-    player.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-    };
-    player.onerror = () => URL.revokeObjectURL(url);
-    player.src = url;
+    if (unique.length === 1) {
+      setLessonTitle((prev) => ({
+        ...prev,
+        [sectionId]: prev[sectionId] || fileTitle(unique[0]),
+      }));
+    }
   };
 
-  const uploadLessonVideo = async (sectionId) => {
-    const file = lessonFile[sectionId];
-    if (!file) {
+  const moveQueuedFile = (sectionId, index, direction) => {
+    setLessonFiles((prev) => {
+      const items = [...(prev[sectionId] || [])];
+      const target = direction === "up" ? index - 1 : index + 1;
+      if (target < 0 || target >= items.length) {
+        return prev;
+      }
+      const current = items[index];
+      items[index] = items[target];
+      items[target] = current;
+      return { ...prev, [sectionId]: items };
+    });
+  };
+
+  const removeQueuedFile = (sectionId, index) => {
+    setLessonFiles((prev) => ({
+      ...prev,
+      [sectionId]: (prev[sectionId] || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const uploadLessonVideos = async (section) => {
+    const files = lessonFiles[section.id] || [];
+    if (!files.length) {
       toast.error("Vui lòng chọn video bài giảng");
       return;
     }
-    setUploading((prev) => ({ ...prev, [sectionId]: true }));
-    setProgress((prev) => ({ ...prev, [sectionId]: 1 }));
+    setUploading((prev) => ({ ...prev, [section.id]: true }));
+    setProgress((prev) => ({ ...prev, [section.id]: 1 }));
     try {
-      const ready = await uploadCourseVideo(file, (value) => {
-        setProgress((prev) => ({ ...prev, [sectionId]: value }));
-      });
-      setLessonReady((prev) => ({
-        ...prev,
-        [sectionId]: {
-          previewVideo: ready.previewVideo,
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const ready = await uploadCourseVideo(file, (value) => {
+          const overall = Math.round(((index + value / 100) / files.length) * 100);
+          setProgress((prev) => ({ ...prev, [section.id]: overall }));
+        });
+        const custom = (lessonTitle[section.id] || "").trim();
+        const title =
+          files.length === 1 && custom ? custom : fileTitle(file);
+        await authPost(`${path}/${section.id}/lessons`, {
+          title,
+          videoUrl: ready.previewVideo,
           durationSeconds: ready.durationSeconds || 0,
-          bytes: ready.bytes || file.size,
+          isPreview: index === 0 && Boolean(lessonPreview[section.id]),
+          isPublished: true,
           originalName: file.name,
-        },
-      }));
-      setLessonFile((prev) => ({ ...prev, [sectionId]: null }));
-      toast.success("Đã tải và nén video bài giảng");
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setUploading((prev) => ({ ...prev, [sectionId]: false }));
-    }
-  };
-
-  const addLesson = async (section) => {
-    const title = (lessonTitle[section.id] || "").trim();
-    const ready = lessonReady[section.id];
-    if (!title) {
-      toast.error("Vui lòng nhập tên bài giảng");
-      return;
-    }
-    if (!ready?.previewVideo) {
-      toast.error("Vui lòng tải và nén video bài giảng");
-      return;
-    }
-    setSaving(true);
-    try {
-      await authPost(`${path}/${section.id}/lessons`, {
-        title,
-        videoUrl: ready.previewVideo,
-        durationSeconds: ready.durationSeconds || 0,
-        isPreview: Boolean(lessonPreview[section.id]),
-        isPublished: true,
-        originalName: ready.originalName,
-        bytes: ready.bytes,
-      });
+          bytes: ready.bytes || file.size,
+        });
+      }
       setLessonTitle((prev) => ({ ...prev, [section.id]: "" }));
-      setLessonFile((prev) => ({ ...prev, [section.id]: null }));
-      setLessonReady((prev) => ({ ...prev, [section.id]: null }));
+      setLessonFiles((prev) => ({ ...prev, [section.id]: [] }));
       setLessonPreview((prev) => ({ ...prev, [section.id]: false }));
       setProgress((prev) => ({ ...prev, [section.id]: 0 }));
-      toast.success("Đã thêm bài giảng");
+      toast.success(
+        files.length === 1
+          ? "Đã thêm bài giảng"
+          : `Đã thêm ${files.length} bài giảng theo thứ tự`,
+      );
       await load();
     } catch (error) {
       toast.error(error.message);
+      await load();
     } finally {
-      setSaving(false);
+      setUploading((prev) => ({ ...prev, [section.id]: false }));
     }
   };
 
@@ -640,17 +654,19 @@ function CourseCurriculum({ course, onBack }) {
                       className="mt-3 grid gap-3 border border-dashed border-border p-3"
                       style={{ borderRadius: "5px" }}
                     >
-                      <Input
-                        value={lessonTitle[section.id] || ""}
-                        onChange={(event) =>
-                          setLessonTitle((prev) => ({
-                            ...prev,
-                            [section.id]: event.target.value,
-                          }))
-                        }
-                        placeholder="Tên bài giảng"
-                        style={{ borderRadius: "5px" }}
-                      />
+                      {(lessonFiles[section.id] || []).length <= 1 ? (
+                        <Input
+                          value={lessonTitle[section.id] || ""}
+                          onChange={(event) =>
+                            setLessonTitle((prev) => ({
+                              ...prev,
+                              [section.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="Tên bài giảng (1 file)"
+                          style={{ borderRadius: "5px" }}
+                        />
+                      ) : null}
                       <div className="grid gap-2">
                         <Label htmlFor={`lesson-video-${section.id}`}>
                           Video bài giảng
@@ -668,64 +684,91 @@ function CourseCurriculum({ course, onBack }) {
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block text-sm font-medium">
-                              {lessonFile[section.id] ||
-                              lessonReady[section.id]?.previewVideo
-                                ? "Đổi file video"
-                                : "Tải video bài giảng"}
+                              {(lessonFiles[section.id] || []).length
+                                ? "Thêm video"
+                                : "Tải nhiều video bài giảng"}
                             </span>
-                            <span className="mt-1 block truncate text-xs text-muted-foreground sm:text-sm">
-                              {lessonFile[section.id]?.name ||
-                                (lessonReady[section.id]?.previewVideo
-                                  ? "Đã nén video"
-                                  : "MP4, WEBM, MOV, MKV")}
+                            <span className="mt-1 block text-xs text-muted-foreground sm:text-sm">
+                              {(lessonFiles[section.id] || []).length
+                                ? `${(lessonFiles[section.id] || []).length} file, xếp theo thứ tự`
+                                : "Chọn nhiều file MP4, WEBM, MOV, MKV"}
                             </span>
                           </span>
                           <input
                             id={`lesson-video-${section.id}`}
                             type="file"
+                            multiple
                             accept="video/mp4,video/webm,video/quicktime,video/x-matroska,.mp4,.webm,.mov,.mkv"
                             className="sr-only"
                             onChange={(event) =>
-                              onPickLessonFile(section.id, event)
+                              onPickLessonFiles(section.id, event)
                             }
                           />
                         </label>
-                        {lessonFile[section.id] ? (
-                          <p className="truncate text-xs text-muted-foreground sm:text-sm">
-                            {lessonFile[section.id].name}
-                          </p>
-                        ) : null}
-                        {lessonFile[section.id] ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              disabled={uploading[section.id]}
-                              onClick={() => uploadLessonVideo(section.id)}
-                              style={{ borderRadius: "5px" }}
-                            >
-                              {uploading[section.id]
-                                ? `Đang tải ${progress[section.id] || 0}%`
-                                : "Tải và nén video"}
-                            </Button>
-                          </div>
+                        {(lessonFiles[section.id] || []).length > 0 ? (
+                          <ul className="grid gap-1">
+                            {(lessonFiles[section.id] || []).map((file, index) => (
+                              <li
+                                key={`${file.name}-${file.size}-${index}`}
+                                className="flex items-center gap-2 border border-border px-2 py-1.5"
+                                style={{ borderRadius: "5px" }}
+                              >
+                                <span className="w-6 shrink-0 text-xs text-muted-foreground">
+                                  {String(index + 1).padStart(2, "0")}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-xs sm:text-sm">
+                                  {file.name}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={uploading[section.id] || index === 0}
+                                  onClick={() =>
+                                    moveQueuedFile(section.id, index, "up")
+                                  }
+                                  aria-label="Lên"
+                                >
+                                  <ArrowUp className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={
+                                    uploading[section.id] ||
+                                    index === (lessonFiles[section.id] || []).length - 1
+                                  }
+                                  onClick={() =>
+                                    moveQueuedFile(section.id, index, "down")
+                                  }
+                                  aria-label="Xuống"
+                                >
+                                  <ArrowDown className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={uploading[section.id]}
+                                  onClick={() =>
+                                    removeQueuedFile(section.id, index)
+                                  }
+                                  aria-label="Xóa file"
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
                         ) : null}
                         {uploading[section.id] ? (
-                          <div className="h-2 overflow-hidden rounded-full bg-muted">
+                          <div className="h-2 overflow-hidden bg-muted" style={{ borderRadius: "5px" }}>
                             <div
                               className="h-full bg-primary transition-all"
                               style={{ width: `${progress[section.id] || 0}%` }}
                             />
                           </div>
-                        ) : null}
-                        {lessonReady[section.id]?.previewVideo ? (
-                          <video
-                            src={lessonReady[section.id].previewVideo}
-                            controls
-                            playsInline
-                            className="aspect-video w-full max-w-[13rem] bg-black object-contain sm:max-w-[16rem]"
-                            style={{ borderRadius: "5px" }}
-                          />
                         ) : null}
                       </div>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -739,16 +782,24 @@ function CourseCurriculum({ course, onBack }) {
                               }))
                             }
                           />
-                          Xem trước miễn phí
+                          Bài đầu xem trước miễn phí
                         </label>
                         <Button
                           type="button"
-                          disabled={saving || uploading[section.id]}
+                          disabled={
+                            saving ||
+                            uploading[section.id] ||
+                            !(lessonFiles[section.id] || []).length
+                          }
                           className="sm:ml-auto"
-                          onClick={() => addLesson(section)}
+                          onClick={() => uploadLessonVideos(section)}
                           style={{ borderRadius: "5px" }}
                         >
-                          Thêm bài giảng
+                          {uploading[section.id]
+                            ? `Đang tải ${progress[section.id] || 0}%`
+                            : (lessonFiles[section.id] || []).length > 1
+                              ? `Tải ${(lessonFiles[section.id] || []).length} video vào phần`
+                              : "Tải video vào phần"}
                         </Button>
                       </div>
                     </div>

@@ -8,6 +8,7 @@ import {
   Clock,
   Globe,
   Heart,
+  Lock,
   Monitor,
   Play,
   ShoppingBag,
@@ -24,6 +25,13 @@ import {
   LEVELS,
 } from "@/components/Course";
 import { cn } from "@/lib/utils";
+import {
+  addOwned,
+  addToCart,
+  canAccessCourse,
+  isInCart,
+  isOwned,
+} from "@/lib/courseAccess";
 
 const LANG = { vi: "Tiếng Việt", en: "English" };
 
@@ -71,12 +79,34 @@ function formatClock(seconds) {
   return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
-function Curriculum({ item }) {
+const PREVIEW_LIMIT = 3;
+
+function previewLessonIds(sections) {
+  const marked = [];
+  const others = [];
+  for (const section of sections) {
+    for (const lesson of section.lessons || []) {
+      if (!lesson.videoUrl) {
+        continue;
+      }
+      if (lesson.isPreview) {
+        marked.push(lesson.id);
+      } else {
+        others.push(lesson.id);
+      }
+    }
+  }
+  const limit = Math.min(PREVIEW_LIMIT, Math.max(2, marked.length));
+  return new Set([...marked, ...others].slice(0, limit));
+}
+
+function Curriculum({ item, unlocked }) {
   const sections = Array.isArray(item.sections) ? item.sections : [];
   const [openIds, setOpenIds] = useState(() =>
     sections.slice(0, 1).map((section) => section.id),
   );
   const [playingId, setPlayingId] = useState(null);
+  const previewIds = previewLessonIds(sections);
 
   const lessonTotal = sections.reduce(
     (sum, section) => sum + (section.lessonCount || section.lessons?.length || 0),
@@ -181,7 +211,10 @@ function Curriculum({ item }) {
               {opened ? (
                 <ul className="bg-background">
                   {lessons.map((lesson) => {
-                    const canPlay = Boolean(lesson.isPreview && lesson.videoUrl);
+                    const isPreview = previewIds.has(lesson.id);
+                    const canPlay = Boolean(
+                      lesson.videoUrl && (unlocked || isPreview),
+                    );
                     const playing = playingId === lesson.id && canPlay;
                     return (
                       <li key={lesson.id} className="border-t border-border">
@@ -193,13 +226,19 @@ function Curriculum({ item }) {
                               setPlayingId(playing ? null : lesson.id);
                               return;
                             }
-                            toast.error("Bài giảng này dành cho học viên đã đăng ký");
+                            toast.error(
+                              "Thêm vào giỏ hàng hoặc mua khóa học để xem bài giảng này",
+                            );
                           }}
                         >
                           <span className="inline-flex min-w-0 items-center gap-2">
-                            <Play className="size-4 shrink-0 text-muted-foreground" />
+                            {canPlay ? (
+                              <Play className="size-4 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <Lock className="size-4 shrink-0 text-muted-foreground" />
+                            )}
                             <span className="truncate">{lesson.title}</span>
-                            {lesson.isPreview ? (
+                            {!unlocked && isPreview ? (
                               <span className="shrink-0 text-xs font-medium text-violet-700">
                                 Xem trước
                               </span>
@@ -316,13 +355,15 @@ function PreviewPlayer({ item }) {
   );
 }
 
-function PurchaseCard({ item }) {
+function PurchaseCard({ item, onAccessChange }) {
   const isFree = item.isFree === true || Number(item.price) <= 0;
   const compare = Number(item.compareAtPrice);
   const showCompare =
     !isFree && Number.isFinite(compare) && compare > Number(item.price);
   const off = discountOf(item.price, item.compareAtPrice);
   const duration = formatDuration(item.durationSeconds);
+  const owned = isOwned(item.id);
+  const inCart = isInCart(item.id);
 
   return (
     <div className="overflow-hidden border border-border bg-background text-foreground shadow-[0_12px_40px_-16px_rgba(0,0,0,0.45)]">
@@ -381,8 +422,13 @@ function PurchaseCard({ item }) {
         </div>
         <button
           type="button"
-          className="inline-flex h-11 w-full items-center justify-center gap-1.5 bg-violet-700 text-sm font-semibold text-white transition hover:bg-violet-600"
-          onClick={() => toast.success(`Đã thêm “${item.title}” vào giỏ hàng`)}
+          disabled={owned || inCart}
+          className="inline-flex h-11 w-full items-center justify-center gap-1.5 bg-violet-700 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-70"
+          onClick={() => {
+            addToCart(item);
+            onAccessChange?.();
+            toast.success(`Đã thêm “${item.title}” vào giỏ hàng`);
+          }}
           style={{
             fontFamily: "'Roboto', sans-serif",
             fontSize: "14px",
@@ -395,12 +441,20 @@ function PurchaseCard({ item }) {
           }}
         >
           <ShoppingBag className="size-4" />
-          Thêm vào giỏ hàng
+          {owned ? "Đã sở hữu" : inCart ? "Đã thêm vào giỏ hàng" : "Thêm vào giỏ hàng"}
         </button>
         <button
           type="button"
-          className="inline-flex h-11 w-full items-center justify-center border border-foreground/20 bg-background text-sm font-semibold transition hover:bg-muted"
-          onClick={() => toast.success("Đăng ký khóa học thành công")}
+          disabled={owned}
+          className="inline-flex h-11 w-full items-center justify-center border border-foreground/20 bg-background text-sm font-semibold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+          onClick={() => {
+            addOwned(item);
+            addToCart(item);
+            onAccessChange?.();
+            toast.success(
+              isFree ? "Đăng ký khóa học thành công" : "Mua khóa học thành công",
+            );
+          }}
           style={{
             fontFamily: "'Roboto', sans-serif",
             fontSize: "14px",
@@ -412,7 +466,11 @@ function PurchaseCard({ item }) {
             borderRadius: "5px",
           }}
         >
-          {isFree ? "Đăng ký miễn phí" : "Mua ngay"}
+          {owned
+            ? "Đã sở hữu"
+            : isFree
+              ? "Đăng ký miễn phí"
+              : "Mua ngay"}
         </button>
         <p
           className="text-center text-xs text-muted-foreground"
@@ -495,6 +553,9 @@ function CourseDetailView({ slug }) {
   const item = detail || items.find((entry) => entry.slug === slug);
   const [expanded, setExpanded] = useState(false);
   const [wished, setWished] = useState(false);
+  const [accessKey, setAccessKey] = useState(0);
+  const unlocked = canAccessCourse(item?.id);
+  void accessKey;
 
   if (!item) {
     return (
@@ -707,7 +768,10 @@ function CourseDetailView({ slug }) {
         </div>
 
         <aside className="order-2 px-3 pb-6 sm:px-6 lg:sticky lg:top-24 lg:row-span-2 lg:self-start lg:px-0 lg:pt-10 lg:pb-10">
-          <PurchaseCard item={item} />
+          <PurchaseCard
+            item={item}
+            onAccessChange={() => setAccessKey((value) => value + 1)}
+          />
           <button
             type="button"
             className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 border border-border text-sm transition hover:bg-muted"
@@ -791,7 +855,7 @@ function CourseDetailView({ slug }) {
             </ul>
           </section>
 
-          <Curriculum item={item} />
+          <Curriculum item={item} unlocked={unlocked} />
 
           {requirements.length > 0 ? (
             <section>

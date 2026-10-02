@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { formatMoney } from "@/components/Course";
@@ -47,15 +47,6 @@ function loginHref() {
 function registerHref() {
   const next = window.location.pathname + window.location.search;
   return `/dang-ky?next=${encodeURIComponent(next || "/thanh-toan")}`;
-}
-
-async function copyValue(value) {
-  try {
-    await navigator.clipboard.writeText(value);
-    toast.success("Đã sao chép");
-  } catch {
-    toast.error("Không thể sao chép");
-  }
 }
 
 const fieldStyle = {
@@ -273,58 +264,21 @@ function PayGuide({ order }) {
       </div>
     );
   }
-  if (order.provider === "BANK_TRANSFER" && order.bankTransfer) {
-    const rows = [
-      ["Ngân hàng", order.bankTransfer.bankName],
-      ["Chủ tài khoản", order.bankTransfer.accountName],
-      ["Số tài khoản", order.bankTransfer.accountNumber],
-      ["Nội dung CK", order.bankTransfer.transferContent],
-      ["Số tiền", formatMoney(order.totalAmount, order.currency)],
-    ];
+  if (order.provider === "BANK_TRANSFER" && order.bankTransfer?.qrUrl) {
     return (
-      <div className="space-y-3 border border-border p-4 sm:p-5">
-        <p className="font-semibold">Chuyển khoản ngân hàng</p>
-        <p className="text-sm text-muted-foreground">
-          Vui lòng chuyển đúng số tiền và nội dung để hệ thống ghi nhận đơn
-          hàng.
-        </p>
-        <dl className="space-y-2">
-          {rows.map(([label, value]) => (
-            <div
-              key={label}
-              className="flex flex-col gap-1 border border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-              style={{ borderRadius: "5px" }}
-            >
-              <dt className="text-xs text-muted-foreground sm:text-sm">
-                {label}
-              </dt>
-              <dd className="flex items-center justify-between gap-3 sm:justify-end">
-                <span className="text-sm font-semibold">{value}</span>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-violet-700 hover:underline"
-                  onClick={() => copyValue(String(value))}
-                >
-                  Sao chép
-                </button>
-              </dd>
-            </div>
-          ))}
-        </dl>
+      <div className="flex justify-center border border-border p-4 sm:p-6">
+        <img
+          src={order.bankTransfer.qrUrl}
+          alt=""
+          className="w-full max-w-[16rem] bg-white p-2"
+          style={{ borderRadius: "5px" }}
+        />
       </div>
     );
   }
   const momo = order.provider === "MOMO";
   return (
-    <div className="space-y-3 border border-border p-4 sm:p-5">
-      <p className="font-semibold">
-        {momo ? "Thanh toán MoMo" : "Thanh toán VNPay"}
-      </p>
-      <p className="text-sm text-muted-foreground">
-        {momo
-          ? "Mở ứng dụng MoMo, chọn thanh toán và nhập mã đơn hàng bên dưới."
-          : "Mở ứng dụng ngân hàng hoặc VNPay, chọn thanh toán QR / nhập mã đơn hàng."}
-      </p>
+    <div className="flex justify-center border border-border p-4 sm:p-6">
       <div
         className={cn(
           "flex aspect-square w-full max-w-[16rem] flex-col items-center justify-center gap-2 text-white",
@@ -332,9 +286,6 @@ function PayGuide({ order }) {
         )}
         style={{ borderRadius: "5px" }}
       >
-        <span className="text-xs uppercase tracking-wide opacity-80">
-          Mã đơn
-        </span>
         <span className="px-3 text-center text-lg font-bold">
           {order.orderCode}
         </span>
@@ -493,17 +444,59 @@ function CheckoutOrder({ orderCode }) {
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const paidRef = useRef(false);
 
   useEffect(() => {
     getCheckout(orderCode)
-      .then(setOrder)
+      .then((next) => {
+        if (next?.status === "PAID") {
+          paidRef.current = true;
+        }
+        setOrder(next);
+      })
       .catch((err) => setError(err.message || "Không tìm thấy đơn hàng"));
   }, [orderCode]);
+
+  useEffect(() => {
+    if (!orderCode || error) {
+      return undefined;
+    }
+    let stopped = false;
+    let timer = 0;
+    const tick = async () => {
+      try {
+        const next = await getCheckout(orderCode);
+        if (stopped) {
+          return;
+        }
+        if (next?.status === "PAID" && !paidRef.current) {
+          paidRef.current = true;
+          addOwnedMany((next.items || []).map((item) => item.courseId));
+          await loadCart();
+          toast.success("Thanh toán thành công");
+        }
+        setOrder(next);
+        if (next?.status === "PAID") {
+          stopped = true;
+          window.clearInterval(timer);
+        }
+      } catch {
+        return;
+      }
+    };
+    tick();
+    timer = window.setInterval(tick, 500);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [orderCode, error]);
 
   const confirm = async () => {
     setConfirming(true);
     try {
       const next = await confirmCheckout(orderCode);
+      paidRef.current = true;
       addOwnedMany((next.items || []).map((item) => item.courseId));
       await loadCart();
       setOrder(next);
@@ -543,17 +536,23 @@ function CheckoutOrder({ orderCode }) {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 sm:py-12">
-      <p className="text-sm text-muted-foreground">Mã đơn {order.orderCode}</p>
-      <h1
-        className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl"
-        style={{ ...fieldStyle, fontSize: "32px", lineHeight: 1.4 }}
+      {paid ? (
+        <h1
+          className="text-2xl font-bold tracking-tight sm:text-3xl"
+          style={{ ...fieldStyle, fontSize: "32px", lineHeight: 1.4 }}
+        >
+          Thanh toán thành công
+        </h1>
+      ) : null}
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start",
+          paid ? "mt-6" : "",
+        )}
       >
-        {paid ? "Thanh toán thành công" : "Hoàn tất thanh toán"}
-      </h1>
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="space-y-4">
           <PayGuide order={order} />
-          {!paid ? (
+          {!paid && order.provider !== "BANK_TRANSFER" ? (
             <button
               type="button"
               disabled={confirming}

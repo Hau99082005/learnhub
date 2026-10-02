@@ -8,4 +8,6 @@ import com.learnhub.backend.modules.cart.models.Payment;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findFirstByOrderIdOrderByIdDesc(Long orderId);
+
+    boolean existsByProviderTxnId(String providerTxnId);
 }

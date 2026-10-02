@@ -1,21 +1,31 @@
 package com.learnhub.backend.modules.cart.services;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.learnhub.backend.config.SePayProperties;
 import com.learnhub.backend.modules.cart.dtos.BankTransferDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutItemDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutRequest;
+import com.learnhub.backend.modules.cart.dtos.SePayWebhookPayload;
 import com.learnhub.backend.modules.cart.models.Cart;
 import com.learnhub.backend.modules.cart.models.CartItem;
 import com.learnhub.backend.modules.cart.models.Enrollment;
@@ -37,6 +47,8 @@ import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfa
 public class CheckoutService {
     private static final String UNAUTH = "Vui lòng đăng nhập để thanh toán";
     private static final Set<String> PROVIDERS = Set.of("VNPAY", "MOMO", "BANK_TRANSFER");
+    private static final Pattern ORDER_CODE = Pattern.compile("LH[0-9A-Z]+", Pattern.CASE_INSENSITIVE);
+    private final ConcurrentHashMap<String, Long> lastReconcile = new ConcurrentHashMap<>();
 
     private final CartRepository carts;
     private final CartItemRepository cartItems;
@@ -45,6 +57,8 @@ public class CheckoutService {
     private final PaymentRepository payments;
     private final EnrollmentRepository enrollments;
     private final UserServicesInterfaces userServices;
+    private final SePayProperties sePayProperties;
+    private final SePayTransactionClient sePayTransactions;
 
     public CheckoutService(
             CartRepository carts,
@@ -53,7 +67,9 @@ public class CheckoutService {
             OrderItemRepository orderItems,
             PaymentRepository payments,
             EnrollmentRepository enrollments,
-            UserServicesInterfaces userServices) {
+            UserServicesInterfaces userServices,
+            SePayProperties sePayProperties,
+            SePayTransactionClient sePayTransactions) {
         this.carts = carts;
         this.cartItems = cartItems;
         this.orders = orders;
@@ -61,6 +77,8 @@ public class CheckoutService {
         this.payments = payments;
         this.enrollments = enrollments;
         this.userServices = userServices;
+        this.sePayProperties = sePayProperties;
+        this.sePayTransactions = sePayTransactions;
     }
 
     @Transactional
@@ -122,12 +140,16 @@ public class CheckoutService {
         return toDto(order, payment);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public CheckoutDTO get(String authorization, String orderCode) {
         user account = requirePayer(authorization);
         ShopOrder order = requireOrder(account, orderCode);
         Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId())
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy thanh toán"));
+        if ("PENDING".equalsIgnoreCase(order.getStatus())
+                && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
+            reconcileFromSePay(order, payment);
+        }
         return toDto(order, payment);
     }
 
@@ -137,8 +159,69 @@ public class CheckoutService {
         ShopOrder order = requireOrder(account, orderCode);
         Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId())
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy thanh toán"));
+        settlePaid(order, payment, payment.getProviderTxnId());
+        return toDto(order, payment);
+    }
+
+    @Transactional
+    public boolean handleSePayWebhook(String authorization, SePayWebhookPayload payload) {
+        if (!sePayAuthorized(authorization)) {
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "Webhook SePay không hợp lệ");
+        }
+        if (payload == null) {
+            return true;
+        }
+        if (payload.getTransferType() != null && !payload.getTransferType().isBlank()
+                && !"in".equalsIgnoreCase(payload.getTransferType().trim())) {
+            return true;
+        }
+        String txnId = payload.getId() == null || payload.getId() <= 0 ? "" : "SEPAY-" + payload.getId();
+        if (!txnId.isBlank() && payments.existsByProviderTxnId(txnId)) {
+            return true;
+        }
+        String orderCode = extractSePayOrderCode(payload);
+        if (orderCode == null || orderCode.isBlank()) {
+            return true;
+        }
+        Optional<ShopOrder> found = orders.findByOrderCode(orderCode);
+        if (found.isEmpty()) {
+            found = orders.findByOrderCode(orderCode.toUpperCase(Locale.ROOT));
+        }
+        if (found.isEmpty()) {
+            return true;
+        }
+        ShopOrder order = found.get();
+        Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
+        if (payment == null) {
+            return true;
+        }
+        BigDecimal paid = payload.getTransferAmount() == null ? BigDecimal.ZERO : payload.getTransferAmount();
+        BigDecimal due = order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount();
+        if (paid.setScale(0, RoundingMode.DOWN).compareTo(due.setScale(0, RoundingMode.DOWN)) < 0) {
+            return true;
+        }
+        settlePaid(order, payment, txnId.isBlank() ? payment.getProviderTxnId() : txnId);
+        return true;
+    }
+
+    private void reconcileFromSePay(ShopOrder order, Payment payment) {
+        String code = order.getOrderCode();
+        long now = System.currentTimeMillis();
+        Long previous = lastReconcile.get(code);
+        if (previous != null && now - previous < 400) {
+            return;
+        }
+        lastReconcile.put(code, now);
+        sePayTransactions.findPaidTransactionId(code, order.getTotalAmount()).ifPresent((txnId) -> {
+            if (!payments.existsByProviderTxnId(txnId)) {
+                settlePaid(order, payment, txnId);
+            }
+        });
+    }
+
+    private void settlePaid(ShopOrder order, Payment payment, String providerTxnId) {
         if ("PAID".equalsIgnoreCase(order.getStatus()) && "SUCCEEDED".equalsIgnoreCase(payment.getStatus())) {
-            return toDto(order, payment);
+            return;
         }
         if (!"PENDING".equalsIgnoreCase(order.getStatus())) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Đơn hàng không thể thanh toán");
@@ -148,8 +231,12 @@ public class CheckoutService {
         order.setPaidAt(now);
         payment.setStatus("SUCCEEDED");
         payment.setPaidAt(now);
+        if (providerTxnId != null && !providerTxnId.isBlank()) {
+            payment.setProviderTxnId(providerTxnId);
+        }
         orders.save(order);
         payments.save(payment);
+        user account = order.getUser();
         List<OrderItem> items = orderItems.findByOrderIdWithCourse(order.getId());
         for (OrderItem item : items) {
             if (enrollments.existsByUserIdAndCourseId(account.getId(), item.getCourse().getId())) {
@@ -163,7 +250,6 @@ public class CheckoutService {
             enrollment.setStatus("ACTIVE");
             enrollments.save(enrollment);
         }
-        return toDto(order, payment);
     }
 
     private ShopOrder requireOrder(user account, String orderCode) {
@@ -207,17 +293,95 @@ public class CheckoutService {
         return "LH" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
     }
 
+    private boolean sePayAuthorized(String authorization) {
+        String expected = firstNonBlank(sePayProperties.getWebhookApiKey(), sePayProperties.getApiToken());
+        String provided = extractSePayKey(authorization);
+        if (expected.isEmpty() || provided.isEmpty()) {
+            return false;
+        }
+        byte[] left = expected.getBytes(StandardCharsets.UTF_8);
+        byte[] right = provided.getBytes(StandardCharsets.UTF_8);
+        return left.length == right.length && MessageDigest.isEqual(left, right);
+    }
+
+    private String extractSePayKey(String authorization) {
+        if (authorization == null) {
+            return "";
+        }
+        String value = authorization.trim();
+        if (value.regionMatches(true, 0, "Apikey ", 0, 7)) {
+            return value.substring(7).trim();
+        }
+        if (value.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return value.substring(7).trim();
+        }
+        return value;
+    }
+
+    private String extractSePayOrderCode(SePayWebhookPayload payload) {
+        String code = payload.getCode() == null ? "" : payload.getCode().trim();
+        if (!code.isBlank()) {
+            Matcher direct = ORDER_CODE.matcher(code);
+            if (direct.find()) {
+                return direct.group().toUpperCase(Locale.ROOT);
+            }
+            return code;
+        }
+        String blob = ((payload.getContent() == null ? "" : payload.getContent()) + " "
+                + (payload.getDescription() == null ? "" : payload.getDescription()));
+        Matcher matcher = ORDER_CODE.matcher(blob);
+        return matcher.find() ? matcher.group().toUpperCase(Locale.ROOT) : "";
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private String qrUrl(ShopOrder order) {
+        String acc = sePayProperties.getAccountNumber();
+        String bank = sePayProperties.getBank();
+        if (acc == null || acc.isBlank() || bank == null || bank.isBlank()) {
+            return "";
+        }
+        String amount = order.getTotalAmount() == null
+                ? "0"
+                : order.getTotalAmount().setScale(0, RoundingMode.DOWN).toPlainString();
+        String base = sePayProperties.getQrUrl();
+        return base
+                + "?acc=" + encode(acc)
+                + "&bank=" + encode(bank)
+                + "&amount=" + encode(amount)
+                + "&des=" + encode(order.getOrderCode())
+                + "&template=compact";
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
     private CheckoutDTO toDto(ShopOrder order, Payment payment) {
         List<CheckoutItemDTO> items = orderItems.findByOrderIdWithCourse(order.getId()).stream()
                 .map(this::toItemDto)
                 .toList();
         BankTransferDTO bank = null;
         if ("BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
+            String bankName = firstNonBlank(sePayProperties.getBank(), "MBBank");
+            String accountName = firstNonBlank(sePayProperties.getAccountName(), "LE VAN HAU");
+            String accountNumber = firstNonBlank(sePayProperties.getAccountNumber(), "");
             bank = new BankTransferDTO(
-                    "Vietcombank",
-                    "CONG TY LEARNHUB",
-                    "0123456789012",
-                    order.getOrderCode());
+                    bankName,
+                    accountName,
+                    accountNumber,
+                    order.getOrderCode(),
+                    qrUrl(order));
         }
         return new CheckoutDTO(
                 order.getId(),

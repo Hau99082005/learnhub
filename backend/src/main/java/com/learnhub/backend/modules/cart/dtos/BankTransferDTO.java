@@ -5,12 +5,27 @@ public class BankTransferDTO {
     private final String accountName;
     private final String accountNumber;
     private final String transferContent;
+    private final String qrUrl;
 
-    public BankTransferDTO(String bankName, String accountName, String accountNumber, String transferContent) {
+    public BankTransferDTO(
+            String bankName,
+            String accountName,
+            String accountNumber,
+            String transferContent) {
+        this(bankName, accountName, accountNumber, transferContent, "");
+    }
+
+    public BankTransferDTO(
+            String bankName,
+            String accountName,
+            String accountNumber,
+            String transferContent,
+            String qrUrl) {
         this.bankName = bankName;
         this.accountName = accountName;
         this.accountNumber = accountNumber;
         this.transferContent = transferContent;
+        this.qrUrl = qrUrl;
     }
 
     public String getBankName() {
@@ -27,5 +42,9 @@ public class BankTransferDTO {
 
     public String getTransferContent() {
         return transferContent;
+    }
+
+    public String getQrUrl() {
+        return qrUrl;
     }
 }

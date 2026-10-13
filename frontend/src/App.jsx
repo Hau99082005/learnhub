@@ -5,6 +5,7 @@ import Footer from "@/components/Layout/footer"
 import Banner from "@/components/Banner"
 import Category from "@/components/Category"
 import Course from "@/components/Course"
+import HomeBlogs from "@/components/HomeBlogs"
 import CoursePage from "@/course/page"
 import CategoryPage from "@/category/page"
 import Instructors from "@/components/Instructors"
@@ -17,6 +18,7 @@ import RegisterPage from "@/Register/page"
 import CartPage from "@/cart/page"
 import CheckoutPage from "@/checkout/page"
 import LearningPage from "@/learning/page"
+import CoursePlayerPage from "@/learn/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast } from "@/lib/auth"
 
@@ -76,6 +78,18 @@ function App() {
     )
   }
 
+  const playerSlug = path.startsWith("/hoc/")
+    ? decodeURIComponent(path.split("/").filter(Boolean)[1] || "")
+    : ""
+  if (playerSlug) {
+    return (
+      <>
+        <CoursePlayerPage slug={playerSlug} />
+        <Toaster position="top-center" richColors />
+      </>
+    )
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
@@ -90,6 +104,7 @@ function App() {
               <Banner />
               <Category />
               <Course />
+              <HomeBlogs />
             </>
           ) : path === "/khoa-hoc" ? (
             <CoursePage />

@@ -95,7 +95,7 @@ function weekdayDots() {
 
 function LearningCard({ item, lists, archived, onArchive, onAddList }) {
   const progress = progressOf(item);
-  const href = `/khoa-hoc/${item.slug}`;
+  const href = `/hoc/${item.slug}`;
   const duration = formatDuration(item.durationSeconds);
   const level = LEVELS[item.level] || LEVELS.ALL;
 

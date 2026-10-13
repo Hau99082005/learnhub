@@ -223,6 +223,10 @@ function Curriculum({ item, unlocked }) {
                           type="button"
                           className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm hover:bg-muted/40 sm:px-5"
                           onClick={() => {
+                            if (isOwned(item.id) && item.slug) {
+                              window.location.href = `/hoc/${item.slug}?bai=${lesson.id}`;
+                              return;
+                            }
                             if (canPlay) {
                               setPlayingId(playing ? null : lesson.id);
                               return;
@@ -432,89 +436,107 @@ function PurchaseCard({ item, onAccessChange }) {
             </>
           ) : null}
         </div>
-        <button
-          type="button"
-          disabled={owned || inCart || adding}
-          className="inline-flex h-11 w-full items-center justify-center gap-1.5 bg-violet-700 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-70"
-          onClick={async () => {
-            setAdding(true);
-            const ok = await addCourseToCart(item);
-            setAdding(false);
-            if (ok) {
-              onAccessChange?.();
-            }
-          }}
-          style={{
-            fontFamily: "'Roboto', sans-serif",
-            fontSize: "14px",
-            fontWeight: "400",
-            fontStyle: "normal",
-            lineHeight: 1.4,
-            letterSpacing: "0.01em",
-            border: "none",
-            borderRadius: "5px",
-          }}
-        >
-          <ShoppingBag className="size-4" />
-          {owned
-            ? "Đã sở hữu"
-            : inCart
-              ? "Đã thêm vào giỏ hàng"
-              : adding
-                ? "Đang thêm..."
-                : "Thêm vào giỏ hàng"}
-        </button>
-        <button
-          type="button"
-          disabled={owned || buying}
-          className="inline-flex h-11 w-full items-center justify-center border border-foreground/20 bg-background text-sm font-semibold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-          onClick={async () => {
-            if (!getAuthUser()) {
-              toast.error("Vui lòng đăng nhập hoặc đăng ký để mua khóa học");
-              return;
-            }
-            setBuying(true);
-            const ok = await addCourseToCart(item);
-            setBuying(false);
-            if (!ok) {
-              return;
-            }
-            addOwned(item);
-            onAccessChange?.();
-            window.location.href = "/gio-hang";
-          }}
-          style={{
-            fontFamily: "'Roboto', sans-serif",
-            fontSize: "14px",
-            fontWeight: "400",
-            fontStyle: "normal",
-            lineHeight: 1.4,
-            letterSpacing: "0.01em",
-            border: "1px solid white",
-            borderRadius: "5px",
-          }}
-        >
-          {owned
-            ? "Đã sở hữu"
-            : isFree
-              ? "Đăng ký miễn phí"
-              : "Mua ngay"}
-        </button>
-        <p
-          className="text-center text-xs text-muted-foreground"
-          style={{
-            fontFamily: "'Roboto', sans-serif",
-            fontSize: "12px",
-            fontWeight: "400",
-            fontStyle: "normal",
-            lineHeight: 1.4,
-            letterSpacing: "0.01em",
-            border: "none",
-            borderRadius: "5px",
-          }}
-        >
-          Đảm bảo hoàn tiền trong 30 ngày
-        </p>
+        {owned ? (
+          <a
+            href={`/hoc/${item.slug}`}
+            className="inline-flex h-11 w-full items-center justify-center gap-1.5 bg-violet-700 text-sm font-semibold text-white transition hover:bg-violet-600"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "14px",
+              fontWeight: "400",
+              fontStyle: "normal",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+              border: "none",
+              borderRadius: "5px",
+            }}
+          >
+            <Play className="size-4 fill-current" />
+            Bắt đầu học
+          </a>
+        ) : (
+          <>
+            <button
+              type="button"
+              disabled={inCart || adding}
+              className="inline-flex h-11 w-full items-center justify-center gap-1.5 bg-violet-700 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-70"
+              onClick={async () => {
+                setAdding(true);
+                const ok = await addCourseToCart(item);
+                setAdding(false);
+                if (ok) {
+                  onAccessChange?.();
+                }
+              }}
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: "14px",
+                fontWeight: "400",
+                fontStyle: "normal",
+                lineHeight: 1.4,
+                letterSpacing: "0.01em",
+                border: "none",
+                borderRadius: "5px",
+              }}
+            >
+              <ShoppingBag className="size-4" />
+              {inCart
+                ? "Đã thêm vào giỏ hàng"
+                : adding
+                  ? "Đang thêm..."
+                  : "Thêm vào giỏ hàng"}
+            </button>
+            <button
+              type="button"
+              disabled={buying}
+              className="inline-flex h-11 w-full items-center justify-center border border-foreground/20 bg-background text-sm font-semibold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+              onClick={async () => {
+                if (!getAuthUser()) {
+                  toast.error("Vui lòng đăng nhập hoặc đăng ký để mua khóa học");
+                  return;
+                }
+                setBuying(true);
+                const ok = await addCourseToCart(item);
+                setBuying(false);
+                if (!ok) {
+                  return;
+                }
+                addOwned(item);
+                onAccessChange?.();
+                window.location.href = "/gio-hang";
+              }}
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: "14px",
+                fontWeight: "400",
+                fontStyle: "normal",
+                lineHeight: 1.4,
+                letterSpacing: "0.01em",
+                border: "1px solid white",
+                borderRadius: "5px",
+              }}
+            >
+              {isFree ? "Đăng ký miễn phí" : "Mua ngay"}
+            </button>
+          </>
+        )}
+        {owned ? null : (
+          <p
+            className="text-center text-xs text-muted-foreground"
+            style={{
+              fontFamily: "'Roboto', sans-serif",
+              fontSize: "12px",
+              fontWeight: "400",
+              fontStyle: "normal",
+              lineHeight: 1.4,
+              letterSpacing: "0.01em",
+              border: "none",
+              borderRadius: "5px",
+            }}
+          >
+            Đảm bảo hoàn tiền trong 30 ngày
+          </p>
+        )}
         <div className="space-y-2 pt-1">
           <p
             className="text-sm font-semibold"

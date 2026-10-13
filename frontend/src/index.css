@@ -143,6 +143,33 @@
   animation: lh-ken 16s ease-in-out infinite alternate;
 }
 
+@keyframes lh-shine {
+  0% { transform: translateX(-140%) skewX(-16deg); }
+  100% { transform: translateX(240%) skewX(-16deg); }
+}
+
+.lh-shine::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: translateX(-140%) skewX(-16deg);
+}
+
+.group:hover .lh-shine::after {
+  animation: lh-shine 0.85s ease;
+}
+
+@keyframes lh-glow {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.85; }
+}
+
+.lh-glow {
+  animation: lh-glow 4.5s ease-in-out infinite;
+}
+
 .lh-hide-scroll {
   -ms-overflow-style: none;
   scrollbar-width: none;

@@ -3,6 +3,8 @@ const WISHLIST_KEY = "learnhub_wishlist";
 const LISTS_KEY = "learnhub_lists";
 const ACCESS_KEY = "learnhub_last_access";
 const STREAK_KEY = "learnhub_streak";
+const PLAYER_KEY = "learnhub_player_progress";
+const NOTES_KEY = "learnhub_player_notes";
 
 function readJson(key, fallback) {
   try {
@@ -165,4 +167,40 @@ export function getStreak() {
     days,
     weekStart: week,
   };
+}
+
+export function getPlayerProgress(courseId) {
+  const all = readJson(PLAYER_KEY, {});
+  const row = all && typeof all === "object" ? all[String(courseId)] : null;
+  return {
+    lastLessonId: Number(row?.lastLessonId) || null,
+    completed: asIds(row?.completed),
+    positions: row?.positions && typeof row.positions === "object" ? row.positions : {},
+  };
+}
+
+export function savePlayerProgress(courseId, patch) {
+  const all = readJson(PLAYER_KEY, {});
+  const current = getPlayerProgress(courseId);
+  const next = {
+    lastLessonId: patch.lastLessonId ?? current.lastLessonId,
+    completed: patch.completed ? asIds(patch.completed) : current.completed,
+    positions: patch.positions || current.positions,
+  };
+  writeJson(PLAYER_KEY, { ...all, [String(courseId)]: next });
+  return next;
+}
+
+export function getLessonNote(courseId, lessonId) {
+  const all = readJson(NOTES_KEY, {});
+  const value = all[`${courseId}:${lessonId}`];
+  return typeof value === "string" ? value : "";
+}
+
+export function saveLessonNote(courseId, lessonId, text) {
+  const all = readJson(NOTES_KEY, {});
+  writeJson(NOTES_KEY, {
+    ...all,
+    [`${courseId}:${lessonId}`]: String(text || ""),
+  });
 }

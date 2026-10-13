@@ -1,5 +1,6 @@
 package com.learnhub.backend.modules.instructor.repositories;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,4 +40,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     boolean existsBySlug(String slug);
 
     boolean existsBySlugAndIdNot(String slug, Long id);
+
+    long countByDeletedAtIsNull();
+
+    long countByDeletedAtIsNullAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            LocalDateTime start,
+            LocalDateTime end);
 }

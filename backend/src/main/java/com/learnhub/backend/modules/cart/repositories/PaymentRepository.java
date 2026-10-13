@@ -1,5 +1,6 @@
 package com.learnhub.backend.modules.cart.repositories;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,4 +11,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findFirstByOrderIdOrderByIdDesc(Long orderId);
 
     boolean existsByProviderTxnId(String providerTxnId);
+
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
 }

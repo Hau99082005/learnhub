@@ -26,68 +26,23 @@ import { AllNews } from "@/admin/news/AllNews";
 import { AllNewsBlog } from "@/admin/news/AllNewsBlog";
 import { AllCourse } from "@/admin/courses/AllCourse";
 
-const STATS = [
-  {
-    label: "Users",
-    value: "26K",
-    change: "-12.4%",
-    up: false,
-    className: "bg-violet-500",
-    data: [
-      { x: 1, y: 18 },
-      { x: 2, y: 22 },
-      { x: 3, y: 16 },
-      { x: 4, y: 24 },
-      { x: 5, y: 20 },
-      { x: 6, y: 26 },
-    ],
-  },
-  {
-    label: "Income",
-    value: "$6,200",
-    change: "40.9%",
-    up: true,
-    className: "bg-sky-500",
-    data: [
-      { x: 1, y: 12 },
-      { x: 2, y: 14 },
-      { x: 3, y: 18 },
-      { x: 4, y: 16 },
-      { x: 5, y: 21 },
-      { x: 6, y: 28 },
-    ],
-  },
-  {
-    label: "Conversion Rate",
-    value: "2.49%",
-    change: "84.7%",
-    up: true,
-    className: "bg-amber-400",
-    data: [
-      { x: 1, y: 8 },
-      { x: 2, y: 10 },
-      { x: 3, y: 9 },
-      { x: 4, y: 14 },
-      { x: 5, y: 18 },
-      { x: 6, y: 22 },
-    ],
-  },
-  {
-    label: "Sessions",
-    value: "44K",
-    change: "-23.6%",
-    up: false,
-    className: "bg-rose-500",
-    data: [
-      { x: 1, y: 20 },
-      { x: 2, y: 26 },
-      { x: 3, y: 18 },
-      { x: 4, y: 24 },
-      { x: 5, y: 16 },
-      { x: 6, y: 14 },
-    ],
-  },
-];
+const STAT_STYLES = {
+  users: "bg-violet-500",
+  orders: "bg-sky-500",
+  courses: "bg-amber-400",
+  payments: "bg-rose-500",
+};
+
+function formatCount(value) {
+  return new Intl.NumberFormat("vi-VN").format(Number(value) || 0);
+}
+
+function toChart(series) {
+  return (Array.isArray(series) ? series : []).map((point, index) => ({
+    x: index + 1,
+    y: Number(point) || 0,
+  }));
+}
 
 const TRAFFIC = [
   { month: "January", current: 170, previous: 90 },
@@ -236,12 +191,66 @@ const Page = () => {
 };
 
 function DashboardView() {
+  const [cards, setCards] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    authGet("/api/admin/stats")
+      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+        const rows = Array.isArray(data?.cards) ? data.cards : [];
+        setCards(
+          rows.map((row) => ({
+            key: row.key,
+            label: row.label,
+            value: formatCount(row.value),
+            change: row.change || "0.0%",
+            up: Boolean(row.up),
+            className: STAT_STYLES[row.key] || "bg-violet-500",
+            data: toChart(row.series),
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCards([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {STATS.map((item) => (
-          <StatCard key={item.label} item={item} />
-        ))}
+        {cards.length === 0
+          ? ["Users", "Orders", "Courses", "Payments"].map((label, index) => (
+              <article
+                key={label}
+                className={`rounded-xl p-4 text-white shadow-sm ${
+                  Object.values(STAT_STYLES)[index]
+                }`}
+              >
+                <p
+                  className="text-2xl font-semibold tracking-tight"
+                  style={{
+                    fontFamily: "'Roboto', sans-serif",
+                    fontWeight: "600",
+                    fontStyle: "normal",
+                    lineHeight: 1.4,
+                    fontSize: "22px",
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  —
+                </p>
+                <p className="mt-3 text-sm font-medium text-white/95">{label}</p>
+              </article>
+            ))
+          : cards.map((item) => <StatCard key={item.key} item={item} />)}
       </div>
       <section className="mt-5 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

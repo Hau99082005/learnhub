@@ -1,5 +1,6 @@
 package com.learnhub.backend.modules.cart.repositories;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,4 +25,6 @@ public interface ShopOrderRepository extends JpaRepository<ShopOrder, Long> {
     List<ShopOrder> findTop100ByUser_IdAndStatusOrderByIdDesc(Long userId, String status);
 
     boolean existsByOrderCode(String orderCode);
+
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
 }

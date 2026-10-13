@@ -33,6 +33,7 @@ import {
 } from "@/lib/courseAccess";
 import { addCourseToCart, loadCart, onCartChange } from "@/lib/cart";
 import { getAuthUser } from "@/lib/auth";
+import { markAccessed } from "@/lib/learning";
 
 const LANG = { vi: "Tiếng Việt", en: "English" };
 
@@ -589,6 +590,12 @@ function CourseDetailView({ slug }) {
     loadCart().then(() => setAccessKey((value) => value + 1));
     return stop;
   }, []);
+
+  useEffect(() => {
+    if (item?.id && isOwned(item.id)) {
+      markAccessed(item.id);
+    }
+  }, [item?.id]);
 
   if (!item) {
     return (

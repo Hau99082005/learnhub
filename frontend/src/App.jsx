@@ -16,6 +16,7 @@ import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
 import CartPage from "@/cart/page"
 import CheckoutPage from "@/checkout/page"
+import LearningPage from "@/learning/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast } from "@/lib/auth"
 
@@ -96,6 +97,8 @@ function App() {
             <CoursePage slug={decodeURIComponent(path.split("/").filter(Boolean)[1])} />
           ) : path === "/gio-hang" ? (
             <CartPage />
+          ) : path === "/hoc-tap" || path === "/danh-sach-mong-uoc" ? (
+            <LearningPage />
           ) : path === "/thanh-toan" || path.startsWith("/thanh-toan/") ? (
             <CheckoutPage />
           ) : path === "/gioi-thieu" ? (

@@ -133,3 +133,27 @@
     letter-spacing: 0.01em;
     }
 }
+
+@keyframes lh-ken {
+  0% { transform: scale(1) translate3d(0, 0, 0); }
+  100% { transform: scale(1.06) translate3d(-1.2%, 0, 0); }
+}
+
+.lh-ken {
+  animation: lh-ken 16s ease-in-out infinite alternate;
+}
+
+.lh-hide-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.lh-hide-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lh-ken {
+    animation: none;
+  }
+}

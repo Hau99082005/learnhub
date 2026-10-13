@@ -491,6 +491,15 @@ function CourseFallback() {
 function CourseGridView() {
   const items = use(getData());
   const [wished, setWished] = useState(() => new Set());
+  const query = new URLSearchParams(window.location.search).get("q")?.trim() || "";
+  const needle = query.toLowerCase();
+  const visible = needle
+    ? items.filter((item) =>
+        [item.title, item.subtitle, item.description]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle)),
+      )
+    : items;
 
   const toggleWish = (id) => {
     setWished((prev) => {
@@ -514,15 +523,17 @@ function CourseGridView() {
           Các khóa học
         </h1>
         <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-          {items.length} khóa học đang mở
+          {query
+            ? `${visible.length} kết quả cho “${query}”`
+            : `${items.length} khóa học đang mở`}
         </p>
-        {items.length === 0 ? (
+        {visible.length === 0 ? (
           <p className="mt-10 text-muted-foreground">
-            Chưa có khóa học xuất bản.
+            {query ? "Không tìm thấy khóa học phù hợp." : "Chưa có khóa học xuất bản."}
           </p>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((item) => (
+            {visible.map((item) => (
               <CourseCard
                 key={item.id}
                 item={item}

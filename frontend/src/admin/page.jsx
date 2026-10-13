@@ -44,16 +44,6 @@ function toChart(series) {
   }));
 }
 
-const TRAFFIC = [
-  { month: "January", current: 170, previous: 90 },
-  { month: "February", current: 145, previous: 70 },
-  { month: "March", current: 155, previous: 95 },
-  { month: "April", current: 168, previous: 120 },
-  { month: "May", current: 175, previous: 110 },
-  { month: "June", current: 162, previous: 80 },
-  { month: "July", current: 150, previous: 105 },
-];
-
 function StatCard({ item }) {
   const Trend = item.up ? ArrowUpRight : ArrowDownRight;
   return (
@@ -192,6 +182,8 @@ const Page = () => {
 
 function DashboardView() {
   const [cards, setCards] = useState([]);
+  const [trend, setTrend] = useState([]);
+  const [range, setRange] = useState({ from: "", to: "" });
 
   useEffect(() => {
     let cancelled = false;
@@ -212,16 +204,38 @@ function DashboardView() {
             data: toChart(row.series),
           })),
         );
+        setTrend(
+          (Array.isArray(data?.trend) ? data.trend : []).map((row) => ({
+            month: row.month,
+            users: Number(row.users) || 0,
+            orders: Number(row.orders) || 0,
+            courses: Number(row.courses) || 0,
+            payments: Number(row.payments) || 0,
+          })),
+        );
+        setRange({ from: data?.from || "", to: data?.to || "" });
       })
       .catch(() => {
         if (!cancelled) {
           setCards([]);
+          setTrend([]);
+          setRange({ from: "", to: "" });
         }
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const peak = Math.max(
+    1,
+    ...trend.flatMap((row) => [row.users, row.orders, row.courses, row.payments]),
+  );
+  const domainMax = Math.max(4, Math.ceil(peak * 1.2));
+  const period =
+    range.from && range.to
+      ? `${range.from} → ${range.to}`
+      : "Đang tải số liệu";
 
   return (
     <>
@@ -266,7 +280,7 @@ function DashboardView() {
                 letterSpacing: "0.01em",
               }}
             >
-              Traffic
+              Hoạt động theo tháng
             </h2>
             <p
               className="text-sm text-muted-foreground"
@@ -279,7 +293,7 @@ function DashboardView() {
                 letterSpacing: "0.01em",
               }}
             >
-              October — April 2026
+              7 tháng gần nhất
             </p>
           </div>
           <div
@@ -293,9 +307,7 @@ function DashboardView() {
               letterSpacing: "0.01em",
             }}
           >
-            <span>10/1/2025</span>
-            <span>→</span>
-            <span>4/30/2026</span>
+            <span>{period}</span>
             <Button type="button" variant="ghost" size="icon" aria-label="Lịch">
               <Calendar className="size-4" />
             </Button>
@@ -309,23 +321,43 @@ function DashboardView() {
             </Button>
           </div>
         </div>
+        <div className="mb-3 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <span className="inline-flex items-center gap-2">
+            <span className="size-2 rounded-full bg-sky-400" />
+            Users
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="size-2 rounded-full bg-emerald-500" />
+            Orders
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="size-2 rounded-full bg-amber-400" />
+            Courses
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="size-2 rounded-full bg-rose-500" />
+            Payments
+          </span>
+        </div>
         <div className="h-[320px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={TRAFFIC}>
+            <AreaChart data={trend}>
               <defs>
-                <linearGradient id="trafficCurrent" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="chartUsers" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="chartOrders" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
                   <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                 </linearGradient>
-                <linearGradient
-                  id="trafficPrevious"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.18} />
-                  <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
+                <linearGradient id="chartCourses" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.16} />
+                  <stop offset="95%" stopColor="#fbbf24" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="chartPayments" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.16} />
+                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -337,23 +369,44 @@ function DashboardView() {
               <YAxis
                 axisLine={false}
                 tickLine={false}
+                allowDecimals={false}
                 tick={{ fill: "currentColor", fontSize: 12 }}
-                domain={[0, 250]}
+                domain={[0, domainMax]}
               />
-              <Tooltip />
+              <Tooltip
+                formatter={(value, name) => [formatCount(value), name]}
+              />
               <Area
                 type="monotone"
-                dataKey="previous"
+                name="Users"
+                dataKey="users"
                 stroke="#38bdf8"
                 strokeWidth={2}
-                fill="url(#trafficPrevious)"
+                fill="url(#chartUsers)"
               />
               <Area
                 type="monotone"
-                dataKey="current"
+                name="Orders"
+                dataKey="orders"
                 stroke="#22c55e"
                 strokeWidth={2}
-                fill="url(#trafficCurrent)"
+                fill="url(#chartOrders)"
+              />
+              <Area
+                type="monotone"
+                name="Courses"
+                dataKey="courses"
+                stroke="#fbbf24"
+                strokeWidth={2}
+                fill="url(#chartCourses)"
+              />
+              <Area
+                type="monotone"
+                name="Payments"
+                dataKey="payments"
+                stroke="#f43f5e"
+                strokeWidth={2}
+                fill="url(#chartPayments)"
               />
             </AreaChart>
           </ResponsiveContainer>

@@ -2,6 +2,7 @@ package com.learnhub.backend.modules.user.services;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -15,6 +16,7 @@ import com.learnhub.backend.modules.cart.repositories.ShopOrderRepository;
 import com.learnhub.backend.modules.instructor.repositories.CourseRepository;
 import com.learnhub.backend.modules.user.dtos.DashboardCardDTO;
 import com.learnhub.backend.modules.user.dtos.DashboardStatsDTO;
+import com.learnhub.backend.modules.user.dtos.DashboardTrendDTO;
 import com.learnhub.backend.modules.user.repositories.userRepository;
 import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfaces;
 
@@ -90,7 +92,32 @@ public class AdminDashboardService {
                         thisMonth.atStartOfDay(),
                         nextMonth.atStartOfDay()),
                 this::countPayments));
-        return new DashboardStatsDTO(List.copyOf(cards));
+        List<DashboardTrendDTO> trend = monthlyTrend();
+        DateTimeFormatter day = DateTimeFormatter.ofPattern("d/M/yyyy");
+        LocalDate start = LocalDate.now().withDayOfMonth(1).minusMonths(6);
+        LocalDate last = LocalDate.now().withDayOfMonth(1).plusMonths(1).minusDays(1);
+        return new DashboardStatsDTO(
+                List.copyOf(cards),
+                List.copyOf(trend),
+                start.format(day),
+                last.format(day));
+    }
+
+    private List<DashboardTrendDTO> monthlyTrend() {
+        DateTimeFormatter label = DateTimeFormatter.ofPattern("M/yyyy");
+        LocalDate cursor = LocalDate.now().withDayOfMonth(1).minusMonths(6);
+        List<DashboardTrendDTO> points = new ArrayList<>();
+        for (int index = 0; index < 7; index++) {
+            LocalDate next = cursor.plusMonths(1);
+            points.add(new DashboardTrendDTO(
+                    cursor.format(label),
+                    countUsers(cursor.atStartOfDay(), next.atStartOfDay()),
+                    countOrders(cursor.atStartOfDay(), next.atStartOfDay()),
+                    countCourses(cursor.atStartOfDay(), next.atStartOfDay()),
+                    countPayments(cursor.atStartOfDay(), next.atStartOfDay())));
+            cursor = next;
+        }
+        return points;
     }
 
     private DashboardCardDTO card(

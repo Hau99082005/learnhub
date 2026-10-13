@@ -20,6 +20,9 @@ import com.learnhub.backend.modules.user.dtos.FirebaseClientConfig;
 import com.learnhub.backend.modules.user.dtos.GoogleAuthRequest;
 import com.learnhub.backend.modules.user.dtos.LoginReponse;
 import com.learnhub.backend.modules.user.dtos.LoginRequest;
+import com.learnhub.backend.modules.user.dtos.PasswordChangeRequest;
+import com.learnhub.backend.modules.user.dtos.ProfileDTO;
+import com.learnhub.backend.modules.user.dtos.ProfileUpdateRequest;
 import com.learnhub.backend.modules.user.dtos.RegisterRequest;
 import com.learnhub.backend.modules.user.dtos.userDTO;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
@@ -241,6 +244,78 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
 
     @Override
     @Transactional(readOnly = true)
+    public ProfileDTO profile(String authorization) {
+        return toProfileDto(requireAccount(authorization));
+    }
+
+    @Override
+    @Transactional
+    public ProfileDTO updateProfile(String authorization, ProfileUpdateRequest request) {
+        user account = requireAccount(authorization);
+        String fullName = request == null || request.getFullName() == null ? "" : request.getFullName().trim();
+        String phone = request == null || request.getPhone() == null ? "" : request.getPhone().replaceAll("\\s+", "");
+        String address = request == null || request.getAddress() == null ? "" : request.getAddress().trim();
+        String bio = request == null || request.getBio() == null ? "" : request.getBio().trim();
+        if (fullName.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng nhập họ và tên", "fullName");
+        }
+        if (fullName.length() > 255) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Họ và tên quá dài", "fullName");
+        }
+        if (phone.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng nhập số điện thoại", "phone");
+        }
+        if (!phone.matches("^(0[3-9]\\d{8}|\\+84[3-9]\\d{8})$")) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Số điện thoại không hợp lệ", "phone");
+        }
+        if (users.existsByPhoneAndIdNot(phone, account.getId())) {
+            throw new AuthException(HttpStatus.CONFLICT, "Số điện thoại đã được sử dụng", "phone");
+        }
+        if (address.length() > 255) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Địa chỉ quá dài", "address");
+        }
+        if (bio.length() > 500) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Giới thiệu tối đa 500 ký tự", "bio");
+        }
+        account.setFullName(fullName);
+        account.setPhone(phone);
+        account.setAddress(address.isBlank() ? "Chưa cập nhật" : address);
+        account.setBio(bio);
+        users.save(account);
+        return toProfileDto(account);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(String authorization, PasswordChangeRequest request) {
+        user account = requireAccount(authorization);
+        String current = request == null || request.getCurrentPassword() == null ? "" : request.getCurrentPassword();
+        String next = request == null || request.getNewPassword() == null ? "" : request.getNewPassword();
+        String confirm = request == null || request.getConfirmPassword() == null ? "" : request.getConfirmPassword();
+        if (current.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng nhập mật khẩu hiện tại", "currentPassword");
+        }
+        if (!passwordEncoder.matches(current, account.getPassword())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không đúng", "currentPassword");
+        }
+        if (next.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng nhập mật khẩu mới", "newPassword");
+        }
+        if (next.length() < 8) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Mật khẩu phải có ít nhất 8 ký tự", "newPassword");
+        }
+        if (!next.equals(confirm)) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Xác nhận mật khẩu không khớp", "confirmPassword");
+        }
+        if (passwordEncoder.matches(next, account.getPassword())) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Mật khẩu mới phải khác mật khẩu hiện tại", "newPassword");
+        }
+        account.setPassword(passwordEncoder.encode(next));
+        users.save(account);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public userDTO requireAdmin(String authorization) {
         user account = requireAccount(authorization);
         if (resolveRole(account) != UserRole.ADMIN) {
@@ -261,6 +336,20 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
                 account.getEmail(),
                 account.getFullName(),
                 resolveRole(account).name());
+    }
+
+    private ProfileDTO toProfileDto(user account) {
+        return new ProfileDTO(
+                account.getId(),
+                account.getEmail(),
+                account.getUsername(),
+                account.getFullName(),
+                account.getPhone(),
+                account.getAddress(),
+                account.getBio(),
+                resolveRole(account).name(),
+                Boolean.TRUE.equals(account.getEmailVerified()),
+                account.getCreatedAt());
     }
 
     @Override

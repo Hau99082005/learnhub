@@ -74,11 +74,17 @@ function loginHref(slug) {
 }
 
 const CoursePlayerPage = ({ slug }) => {
-  const user = getAuthUser();
+  const userId = getAuthUser()?.id || null;
   const videoRef = useRef(null);
   const wrapRef = useRef(null);
   const hideTimer = useRef(null);
   const lastSavedSec = useRef(-1);
+  const progressRef = useRef(null);
+  const clockRef = useRef(null);
+  const durationRef = useRef(0);
+  const controlsRef = useRef(true);
+  const completedRef = useRef([]);
+  const currentIdRef = useRef(null);
   const [course, setCourse] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -88,19 +94,23 @@ const CoursePlayerPage = ({ slug }) => {
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [rate, setRate] = useState(1);
-  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [controls, setControls] = useState(true);
-  const [sidebar, setSidebar] = useState(() => window.innerWidth >= 1024);
+  const [sidebar, setSidebar] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 768 : true,
+  );
   const [openSections, setOpenSections] = useState([]);
   const [tab, setTab] = useState("overview");
   const [note, setNote] = useState("");
   const [showRate, setShowRate] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
 
+  completedRef.current = completed;
+
   const sections = Array.isArray(course?.sections) ? course.sections : [];
   const lessons = useMemo(() => flattenLessons(sections), [sections]);
   const current = lessons.find((item) => item.id === lessonId) || lessons[0] || null;
+  currentIdRef.current = current?.id || null;
   const currentIndex = current
     ? lessons.findIndex((item) => item.id === current.id)
     : -1;
@@ -123,9 +133,9 @@ const CoursePlayerPage = ({ slug }) => {
   );
 
   const selectLesson = useCallback(
-    (id, autoPlay = true) => {
+    (id) => {
       const lesson = lessons.find((item) => item.id === id);
-      if (!lesson) {
+      if (!lesson || lesson.id === currentIdRef.current) {
         return;
       }
       setLessonId(lesson.id);
@@ -135,13 +145,12 @@ const CoursePlayerPage = ({ slug }) => {
       persist({ lastLessonId: lesson.id });
       lastSavedSec.current = -1;
       window.history.replaceState(null, "", `/hoc/${slug}?bai=${lesson.id}`);
-      void autoPlay;
     },
-    [course?.courseId, lessons, persist, slug],
+    [lessons, persist, slug],
   );
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       window.location.href = loginHref(slug);
       return undefined;
     }
@@ -156,6 +165,7 @@ const CoursePlayerPage = ({ slug }) => {
         markAccessed(data.courseId);
         recordStreakVisit();
         const progress = getPlayerProgress(data.courseId);
+        completedRef.current = progress.completed;
         setCompleted(progress.completed);
         const flat = flattenLessons(data.sections);
         const wanted = Number(
@@ -188,7 +198,7 @@ const CoursePlayerPage = ({ slug }) => {
     return () => {
       cancelled = true;
     };
-  }, [slug, user]);
+  }, [slug, userId]);
 
   useEffect(() => {
     if (course?.courseId && lessonId) {
@@ -205,32 +215,41 @@ const CoursePlayerPage = ({ slug }) => {
       authPut(`/api/learning/courses/${encodeURIComponent(slug)}/progress`, {
         percent: value,
       }).catch(() => {});
-    }, 600);
+    }, 1200);
     return () => window.clearTimeout(timer);
   }, [completed, course?.courseId, lessons.length, slug]);
 
-  const markDone = (id) => {
-    if (!id || completedSet.has(id)) {
-      return;
-    }
-    const next = [...completed, id];
-    setCompleted(next);
-    persist({ completed: next, lastLessonId: id });
-  };
+  const markDone = useCallback(
+    (id) => {
+      if (!id || completedRef.current.includes(id)) {
+        return;
+      }
+      const next = [...completedRef.current, id];
+      completedRef.current = next;
+      setCompleted(next);
+      persist({ completed: next, lastLessonId: id });
+    },
+    [persist],
+  );
 
   const toggleDone = (id) => {
     const next = completedSet.has(id)
       ? completed.filter((value) => value !== id)
       : [...completed, id];
+    completedRef.current = next;
     setCompleted(next);
     persist({ completed: next });
   };
 
   const revealControls = () => {
-    setControls(true);
+    if (!controlsRef.current) {
+      controlsRef.current = true;
+      setControls(true);
+    }
     window.clearTimeout(hideTimer.current);
     hideTimer.current = window.setTimeout(() => {
       if (videoRef.current && !videoRef.current.paused) {
+        controlsRef.current = false;
         setControls(false);
       }
     }, 2200);
@@ -324,7 +343,16 @@ const CoursePlayerPage = ({ slug }) => {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (!user) {
+  const paintTime = (time) => {
+    if (progressRef.current) {
+      progressRef.current.value = String(time);
+    }
+    if (clockRef.current) {
+      clockRef.current.textContent = `${formatClock(time)} / ${formatClock(durationRef.current)}`;
+    }
+  };
+
+  if (!userId) {
     return null;
   }
 
@@ -387,7 +415,7 @@ const CoursePlayerPage = ({ slug }) => {
         </button>
         <button
           type="button"
-          className="inline-flex size-9 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 lg:hidden"
+          className="inline-flex size-9 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 md:hidden"
           aria-label={sidebar ? "Đóng nội dung" : "Mở nội dung"}
           onClick={() => setSidebar((value) => !value)}
         >
@@ -395,13 +423,12 @@ const CoursePlayerPage = ({ slug }) => {
         </button>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             ref={wrapRef}
             className="relative bg-black"
             onMouseMove={revealControls}
-            onClick={revealControls}
           >
             {current?.videoUrl ? (
               <video
@@ -410,46 +437,45 @@ const CoursePlayerPage = ({ slug }) => {
                 src={current.videoUrl}
                 autoPlay
                 playsInline
-                className="aspect-video max-h-[min(70vh,780px)] w-full bg-black object-contain lg:max-h-[calc(100vh-12rem)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  togglePlay();
-                }}
+                className="aspect-video max-h-[min(70vh,780px)] w-full bg-black object-contain md:max-h-[calc(100vh-12rem)]"
+                onClick={togglePlay}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
                 onTimeUpdate={(event) => {
                   const node = event.currentTarget;
-                  setCurrentTime(node.currentTime);
-                  if (!course.courseId || !current) {
+                  paintTime(node.currentTime);
+                  const courseId = course.courseId;
+                  const id = currentIdRef.current;
+                  if (!courseId || !id) {
                     return;
                   }
                   const sec = Math.floor(node.currentTime);
-                  if (sec !== lastSavedSec.current) {
+                  if (sec - lastSavedSec.current >= 5 || lastSavedSec.current < 0) {
                     lastSavedSec.current = sec;
                     const positions = {
-                      ...getPlayerProgress(course.courseId).positions,
-                      [current.id]: sec,
+                      ...getPlayerProgress(courseId).positions,
+                      [id]: sec,
                     };
-                    persist({ lastLessonId: current.id, positions });
+                    persist({ lastLessonId: id, positions });
                   }
-                  if (
-                    node.duration > 0 &&
-                    node.currentTime / node.duration >= 0.9
-                  ) {
-                    markDone(current.id);
+                  if (node.duration > 0 && node.currentTime / node.duration >= 0.9) {
+                    markDone(id);
                   }
                 }}
                 onLoadedMetadata={(event) => {
                   const node = event.currentTarget;
-                  setDuration(node.duration || 0);
+                  durationRef.current = node.duration || 0;
+                  setDuration(durationRef.current);
                   node.playbackRate = rate;
                   node.volume = volume;
                   node.muted = muted;
-                  const saved = getPlayerProgress(course.courseId).positions[
-                    current.id
-                  ];
+                  const saved = getPlayerProgress(course.courseId).positions[current.id];
                   if (Number(saved) > 3) {
                     node.currentTime = Number(saved);
+                  }
+                  paintTime(node.currentTime);
+                  if (progressRef.current) {
+                    progressRef.current.max = String(durationRef.current);
                   }
                 }}
                 onEnded={() => {
@@ -469,10 +495,7 @@ const CoursePlayerPage = ({ slug }) => {
                 type="button"
                 className="absolute inset-0 z-[5] flex items-center justify-center"
                 aria-label="Phát"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  togglePlay();
-                }}
+                onClick={togglePlay}
               >
                 <span className="flex size-16 items-center justify-center rounded-full bg-white text-zinc-950 shadow-2xl transition hover:scale-105">
                   <Play className="ml-0.5 size-7 fill-current" />
@@ -488,22 +511,23 @@ const CoursePlayerPage = ({ slug }) => {
             <div
               className={cn(
                 "absolute inset-x-0 bottom-0 z-10 px-3 pb-3 transition-opacity duration-300 sm:px-5 sm:pb-4",
-                controls ? "opacity-100" : "opacity-0",
+                controls ? "opacity-100" : "pointer-events-none opacity-0",
               )}
             >
               <input
+                ref={progressRef}
                 type="range"
                 min="0"
                 max={duration || 0}
                 step="0.1"
-                value={Math.min(currentTime, duration || 0)}
+                defaultValue={0}
                 className="h-1.5 w-full cursor-pointer accent-violet-500"
                 onChange={(event) => {
                   const value = Number(event.target.value);
                   if (videoRef.current) {
                     videoRef.current.currentTime = value;
                   }
-                  setCurrentTime(value);
+                  paintTime(value);
                 }}
               />
               <div className="mt-2 flex items-center gap-1.5 text-white sm:gap-2">
@@ -564,8 +588,11 @@ const CoursePlayerPage = ({ slug }) => {
                     }
                   }}
                 />
-                <span className="ml-1 text-[11px] text-white/80 sm:text-xs">
-                  {formatClock(currentTime)} / {formatClock(duration)}
+                <span
+                  ref={clockRef}
+                  className="ml-1 text-[11px] text-white/80 sm:text-xs"
+                >
+                  {formatClock(0)} / {formatClock(duration)}
                 </span>
                 <span className="ml-auto" />
                 <div className="relative">
@@ -627,7 +654,7 @@ const CoursePlayerPage = ({ slug }) => {
                 </button>
                 <button
                   type="button"
-                  className="hidden rounded-full p-1.5 transition hover:bg-white/15 lg:inline-flex"
+                  className="hidden rounded-full p-1.5 transition hover:bg-white/15 md:inline-flex"
                   aria-label="Nội dung khóa học"
                   onClick={() => setSidebar((value) => !value)}
                 >
@@ -637,7 +664,7 @@ const CoursePlayerPage = ({ slug }) => {
             </div>
           </div>
 
-          <div className="border-b border-white/10 bg-zinc-950">
+          <div className="relative z-10 border-b border-white/10 bg-zinc-950">
             <div className="flex gap-1 overflow-x-auto px-3 sm:px-5">
               {TABS.map((item) => (
                 <button
@@ -661,7 +688,7 @@ const CoursePlayerPage = ({ slug }) => {
             </div>
           </div>
 
-          <div className="flex-1 bg-background px-4 py-5 text-foreground sm:px-6">
+          <div className="relative z-10 flex-1 bg-background px-4 py-5 text-foreground sm:px-6">
             {tab === "overview" ? (
               <div className="max-w-3xl">
                 <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
@@ -675,10 +702,9 @@ const CoursePlayerPage = ({ slug }) => {
                   <p className="mt-4 text-sm leading-relaxed">{course.subtitle}</p>
                 ) : null}
                 {course.description ? (
-                  <div
-                    className="prose prose-sm mt-4 max-w-none text-muted-foreground dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: course.description }}
-                  />
+                  <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                    {course.description}
+                  </p>
                 ) : null}
                 <div className="mt-6 flex flex-wrap gap-2">
                   <Button
@@ -744,14 +770,14 @@ const CoursePlayerPage = ({ slug }) => {
         </div>
 
         {sidebar ? (
-          <aside className="fixed inset-0 z-40 bg-black/50 lg:static lg:z-0 lg:w-[360px] lg:shrink-0 lg:bg-transparent">
+          <>
             <button
               type="button"
-              className="absolute inset-0 lg:hidden"
+              className="fixed inset-0 z-30 bg-black/50 md:hidden"
               aria-label="Đóng nội dung"
               onClick={() => setSidebar(false)}
             />
-            <div className="absolute inset-y-0 right-0 flex h-full w-[min(100%,22rem)] flex-col border-l border-white/10 bg-zinc-950 lg:static lg:w-full">
+            <aside className="fixed inset-y-0 right-0 z-40 flex h-full w-[min(100%,22rem)] flex-col border-l border-white/10 bg-zinc-950 md:static md:z-0 md:h-auto md:w-[320px] md:shrink-0 lg:w-[360px]">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold">Nội dung khóa học</p>
@@ -761,7 +787,7 @@ const CoursePlayerPage = ({ slug }) => {
                 </div>
                 <button
                   type="button"
-                  className="rounded-full p-1 text-white/70 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-full p-1 text-white/70 transition hover:bg-white/10 hover:text-white md:hidden"
                   onClick={() => setSidebar(false)}
                 >
                   <X className="size-4" />
@@ -826,7 +852,7 @@ const CoursePlayerPage = ({ slug }) => {
                                   )}
                                   onClick={() => {
                                     selectLesson(lesson.id);
-                                    if (window.innerWidth < 1024) {
+                                    if (window.innerWidth < 768) {
                                       setSidebar(false);
                                     }
                                   }}
@@ -859,8 +885,8 @@ const CoursePlayerPage = ({ slug }) => {
                   );
                 })}
               </div>
-            </div>
-          </aside>
+            </aside>
+          </>
         ) : null}
       </div>
     </div>

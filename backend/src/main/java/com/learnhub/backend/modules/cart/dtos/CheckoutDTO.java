@@ -14,6 +14,7 @@ public class CheckoutDTO {
     private final String currency;
     private final String checkoutUrl;
     private final BankTransferDTO bankTransfer;
+    private final SePayGatewayDTO gateway;
     private final List<CheckoutItemDTO> items;
 
     public CheckoutDTO(
@@ -27,6 +28,7 @@ public class CheckoutDTO {
             String currency,
             String checkoutUrl,
             BankTransferDTO bankTransfer,
+            SePayGatewayDTO gateway,
             List<CheckoutItemDTO> items) {
         this.orderId = orderId;
         this.orderCode = orderCode;
@@ -38,6 +40,7 @@ public class CheckoutDTO {
         this.currency = currency;
         this.checkoutUrl = checkoutUrl;
         this.bankTransfer = bankTransfer;
+        this.gateway = gateway;
         this.items = items;
     }
 
@@ -79,6 +82,10 @@ public class CheckoutDTO {
 
     public BankTransferDTO getBankTransfer() {
         return bankTransfer;
+    }
+
+    public SePayGatewayDTO getGateway() {
+        return gateway;
     }
 
     public List<CheckoutItemDTO> getItems() {

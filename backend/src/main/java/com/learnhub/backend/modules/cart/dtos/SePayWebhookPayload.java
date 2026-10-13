@@ -7,8 +7,16 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SePayWebhookPayload {
-    private Long id;
+    private String id;
     private String gateway;
+
+    @JsonAlias({"order_id", "orderId", "order_code", "merchant_order_id"})
+    private String orderId;
+
+    @JsonAlias({"transaction_id", "transactionId"})
+    private String transactionId;
+
+    private String status;
 
     @JsonAlias({"transaction_date"})
     private String transactionDate;
@@ -17,6 +25,7 @@ public class SePayWebhookPayload {
     private String accountNumber;
 
     private String code;
+    @JsonAlias({"transaction_content", "transactionContent"})
     private String content;
 
     @JsonAlias({"transfer_type"})
@@ -30,12 +39,36 @@ public class SePayWebhookPayload {
 
     private String description;
 
-    public Long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
+    }
+
+    public String getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(String orderId) {
+        this.orderId = orderId;
+    }
+
+    public String getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(String transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public String getGateway() {

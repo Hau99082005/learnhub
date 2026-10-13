@@ -11,8 +11,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,6 +23,7 @@ import com.learnhub.backend.modules.cart.dtos.BankTransferDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutItemDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutRequest;
+import com.learnhub.backend.modules.cart.dtos.SePayGatewayDTO;
 import com.learnhub.backend.modules.cart.dtos.SePayWebhookPayload;
 import com.learnhub.backend.modules.cart.models.Cart;
 import com.learnhub.backend.modules.cart.models.CartItem;
@@ -48,7 +47,6 @@ public class CheckoutService {
     private static final String UNAUTH = "Vui lòng đăng nhập để thanh toán";
     private static final Set<String> PROVIDERS = Set.of("VNPAY", "MOMO", "BANK_TRANSFER");
     private static final Pattern ORDER_CODE = Pattern.compile("LH[0-9A-Z]+", Pattern.CASE_INSENSITIVE);
-    private final ConcurrentHashMap<String, Long> lastReconcile = new ConcurrentHashMap<>();
 
     private final CartRepository carts;
     private final CartItemRepository cartItems;
@@ -59,6 +57,7 @@ public class CheckoutService {
     private final UserServicesInterfaces userServices;
     private final SePayProperties sePayProperties;
     private final SePayTransactionClient sePayTransactions;
+    private final SePayGatewayClient sePayGateway;
 
     public CheckoutService(
             CartRepository carts,
@@ -69,7 +68,8 @@ public class CheckoutService {
             EnrollmentRepository enrollments,
             UserServicesInterfaces userServices,
             SePayProperties sePayProperties,
-            SePayTransactionClient sePayTransactions) {
+            SePayTransactionClient sePayTransactions,
+            SePayGatewayClient sePayGateway) {
         this.carts = carts;
         this.cartItems = cartItems;
         this.orders = orders;
@@ -79,6 +79,7 @@ public class CheckoutService {
         this.userServices = userServices;
         this.sePayProperties = sePayProperties;
         this.sePayTransactions = sePayTransactions;
+        this.sePayGateway = sePayGateway;
     }
 
     @Transactional
@@ -97,6 +98,10 @@ public class CheckoutService {
                 throw new AuthException(HttpStatus.BAD_REQUEST, "Khóa học không khả dụng");
             }
             if (enrollments.existsByUserIdAndCourseId(account.getId(), course.getId())) {
+                CheckoutDTO owned = latestOwnedCheckout(account, course.getId());
+                if (owned != null) {
+                    return owned;
+                }
                 throw new AuthException(HttpStatus.CONFLICT, "Bạn đã sở hữu một khóa học trong giỏ");
             }
         }
@@ -148,7 +153,24 @@ public class CheckoutService {
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy thanh toán"));
         if ("PENDING".equalsIgnoreCase(order.getStatus())
                 && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
-            reconcileFromSePay(order, payment);
+            matchFromSePay(order, payment);
+        }
+        return toDto(order, payment);
+    }
+
+    @Transactional
+    public CheckoutDTO latest(String authorization) {
+        user account = requirePayer(authorization);
+        List<ShopOrder> recent = orders.findTop20ByUser_IdOrderByIdDesc(account.getId());
+        if (recent.isEmpty()) {
+            throw new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng");
+        }
+        ShopOrder order = recent.get(0);
+        Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId())
+                .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy thanh toán"));
+        if ("PENDING".equalsIgnoreCase(order.getStatus())
+                && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
+            matchFromSePay(order, payment);
         }
         return toDto(order, payment);
     }
@@ -159,8 +181,54 @@ public class CheckoutService {
         ShopOrder order = requireOrder(account, orderCode);
         Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId())
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy thanh toán"));
+        if ("BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
+            matchFromSePay(order, payment);
+            return toDto(order, payment);
+        }
         settlePaid(order, payment, payment.getProviderTxnId());
         return toDto(order, payment);
+    }
+
+    @Transactional
+    public boolean handleSePayIpn(String authorization, String rawBody) {
+        if (!sePayAuthorized(authorization)) {
+            throw new AuthException(HttpStatus.UNAUTHORIZED, "IPN SePay không hợp lệ");
+        }
+        if (rawBody == null || rawBody.isBlank()) {
+            return true;
+        }
+        tools.jackson.databind.JsonNode body;
+        try {
+            body = new tools.jackson.databind.ObjectMapper().readTree(rawBody);
+        } catch (RuntimeException exception) {
+            return true;
+        }
+        String type = textNode(body, "notification_type");
+        if ("ORDER_PAID".equalsIgnoreCase(type) || "TRANSACTION_CAPTURED".equalsIgnoreCase(type)) {
+            tools.jackson.databind.JsonNode orderNode = body.path("order");
+            String invoice = firstNonBlank(
+                    textNode(orderNode, "order_invoice_number"),
+                    textNode(orderNode, "order_id"));
+            if (invoice.isBlank()) {
+                return true;
+            }
+            Optional<ShopOrder> found = orders.findByOrderCode(invoice.trim());
+            if (found.isEmpty()) {
+                return true;
+            }
+            ShopOrder order = found.get();
+            Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
+            if (payment == null) {
+                return true;
+            }
+            String txn = firstNonBlank(
+                    textNode(body.path("transaction"), "transaction_id"),
+                    textNode(orderNode, "id"),
+                    invoice);
+            settlePaid(order, payment, "SEPAY-" + txn);
+            return true;
+        }
+        return handleSePayPayload(toWebhookPayload(body));
     }
 
     @Transactional
@@ -168,25 +236,27 @@ public class CheckoutService {
         if (!sePayAuthorized(authorization)) {
             throw new AuthException(HttpStatus.UNAUTHORIZED, "Webhook SePay không hợp lệ");
         }
+        return handleSePayPayload(payload);
+    }
+
+    private boolean handleSePayPayload(SePayWebhookPayload payload) {
         if (payload == null) {
             return true;
         }
-        if (payload.getTransferType() != null && !payload.getTransferType().isBlank()
-                && !"in".equalsIgnoreCase(payload.getTransferType().trim())) {
+        if (isFailedStatus(payload.getStatus())) {
             return true;
         }
-        String txnId = payload.getId() == null || payload.getId() <= 0 ? "" : "SEPAY-" + payload.getId();
+        if (payload.getTransferType() != null && !payload.getTransferType().isBlank()
+                && !"in".equalsIgnoreCase(payload.getTransferType().trim())
+                && !"payment".equalsIgnoreCase(payload.getTransferType().trim())) {
+            return true;
+        }
+        String rawId = firstNonBlank(payload.getTransactionId(), payload.getId());
+        String txnId = rawId.isBlank() ? "" : "SEPAY-" + rawId;
         if (!txnId.isBlank() && payments.existsByProviderTxnId(txnId)) {
             return true;
         }
-        String orderCode = extractSePayOrderCode(payload);
-        if (orderCode == null || orderCode.isBlank()) {
-            return true;
-        }
-        Optional<ShopOrder> found = orders.findByOrderCode(orderCode);
-        if (found.isEmpty()) {
-            found = orders.findByOrderCode(orderCode.toUpperCase(Locale.ROOT));
-        }
+        Optional<ShopOrder> found = resolveSePayOrder(payload);
         if (found.isEmpty()) {
             return true;
         }
@@ -197,26 +267,48 @@ public class CheckoutService {
         }
         BigDecimal paid = payload.getTransferAmount() == null ? BigDecimal.ZERO : payload.getTransferAmount();
         BigDecimal due = order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount();
-        if (paid.setScale(0, RoundingMode.DOWN).compareTo(due.setScale(0, RoundingMode.DOWN)) < 0) {
+        if (paid.compareTo(BigDecimal.ZERO) > 0
+                && paid.setScale(0, RoundingMode.DOWN).compareTo(due.setScale(0, RoundingMode.DOWN)) < 0) {
             return true;
         }
         settlePaid(order, payment, txnId.isBlank() ? payment.getProviderTxnId() : txnId);
         return true;
     }
 
-    private void reconcileFromSePay(ShopOrder order, Payment payment) {
-        String code = order.getOrderCode();
-        long now = System.currentTimeMillis();
-        Long previous = lastReconcile.get(code);
-        if (previous != null && now - previous < 400) {
+    private void matchFromSePay(ShopOrder order, Payment payment) {
+        if (!"PENDING".equalsIgnoreCase(order.getStatus())) {
             return;
         }
-        lastReconcile.put(code, now);
-        sePayTransactions.findPaidTransactionId(code, order.getTotalAmount()).ifPresent((txnId) -> {
-            if (!payments.existsByProviderTxnId(txnId)) {
-                settlePaid(order, payment, txnId);
+        Optional<String> captured = sePayGateway.findCaptured(order.getOrderCode(), order.getTotalAmount());
+        if (captured.isPresent()) {
+            settlePaid(order, payment, captured.get());
+            return;
+        }
+        sePayTransactions.findPaid(order.getOrderCode(), order.getTotalAmount())
+                .ifPresent((hit) -> settlePaid(order, payment, hit.txnId()));
+    }
+
+    private CheckoutDTO latestOwnedCheckout(user account, Long courseId) {
+        for (ShopOrder order : orders.findTop20ByUser_IdOrderByIdDesc(account.getId())) {
+            boolean hasCourse = orderItems.findByOrderIdWithCourse(order.getId()).stream()
+                    .anyMatch((item) -> item.getCourse() != null && courseId.equals(item.getCourse().getId()));
+            if (!hasCourse) {
+                continue;
             }
-        });
+            Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
+            if (payment == null) {
+                continue;
+            }
+            if ("PAID".equalsIgnoreCase(order.getStatus())
+                    || "PENDING".equalsIgnoreCase(order.getStatus())) {
+                if ("PENDING".equalsIgnoreCase(order.getStatus())
+                        && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
+                    matchFromSePay(order, payment);
+                }
+                return toDto(order, payment);
+            }
+        }
+        return null;
     }
 
     private void settlePaid(ShopOrder order, Payment payment, String providerTxnId) {
@@ -285,21 +377,29 @@ public class CheckoutService {
 
     private String nextOrderCode() {
         for (int attempt = 0; attempt < 8; attempt += 1) {
-            String code = "LH" + System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(10, 99);
+            String code = "LH" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
             if (!orders.existsByOrderCode(code)) {
                 return code;
             }
         }
-        return "LH" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
+        return "LH" + Long.toString(Math.abs(System.nanoTime()), 36).toUpperCase(Locale.ROOT);
     }
 
     private boolean sePayAuthorized(String authorization) {
-        String expected = firstNonBlank(sePayProperties.getWebhookApiKey(), sePayProperties.getApiToken());
         String provided = extractSePayKey(authorization);
-        if (expected.isEmpty() || provided.isEmpty()) {
+        if (provided.isEmpty()) {
             return false;
         }
-        byte[] left = expected.getBytes(StandardCharsets.UTF_8);
+        return secretEquals(provided, sePayProperties.getIpnSecret())
+                || secretEquals(provided, sePayProperties.getWebhookApiKey())
+                || secretEquals(provided, sePayProperties.getApiToken());
+    }
+
+    private boolean secretEquals(String provided, String expected) {
+        if (expected == null || expected.isBlank()) {
+            return false;
+        }
+        byte[] left = expected.trim().getBytes(StandardCharsets.UTF_8);
         byte[] right = provided.getBytes(StandardCharsets.UTF_8);
         return left.length == right.length && MessageDigest.isEqual(left, right);
     }
@@ -318,19 +418,53 @@ public class CheckoutService {
         return value;
     }
 
-    private String extractSePayOrderCode(SePayWebhookPayload payload) {
-        String code = payload.getCode() == null ? "" : payload.getCode().trim();
-        if (!code.isBlank()) {
-            Matcher direct = ORDER_CODE.matcher(code);
-            if (direct.find()) {
-                return direct.group().toUpperCase(Locale.ROOT);
-            }
-            return code;
+    private boolean isFailedStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return false;
         }
-        String blob = ((payload.getContent() == null ? "" : payload.getContent()) + " "
-                + (payload.getDescription() == null ? "" : payload.getDescription()));
+        String value = status.trim().toUpperCase(Locale.ROOT);
+        return value.contains("FAIL") || value.contains("CANCEL") || value.contains("ERROR")
+                || "0".equals(value) || "FALSE".equals(value);
+    }
+
+    private Optional<ShopOrder> resolveSePayOrder(SePayWebhookPayload payload) {
+        if (payload.getOrderId() != null && !payload.getOrderId().isBlank()) {
+            Optional<ShopOrder> byOrder = orders.findByOrderCode(payload.getOrderId().trim());
+            if (byOrder.isPresent()) {
+                return byOrder;
+            }
+        }
+        String blob = sePayBlob(payload);
         Matcher matcher = ORDER_CODE.matcher(blob);
-        return matcher.find() ? matcher.group().toUpperCase(Locale.ROOT) : "";
+        while (matcher.find()) {
+            String token = matcher.group().toUpperCase(Locale.ROOT);
+            Optional<ShopOrder> exact = orders.findByOrderCode(token);
+            if (exact.isPresent()) {
+                return exact;
+            }
+        }
+        BigDecimal paid = payload.getTransferAmount() == null ? BigDecimal.ZERO : payload.getTransferAmount();
+        for (ShopOrder order : orders.findTop40ByStatusOrderByIdDesc("PENDING")) {
+            if (!SePayTransactionClient.matchesOrder(blob, order.getOrderCode())) {
+                continue;
+            }
+            BigDecimal due = order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount();
+            if (paid.compareTo(BigDecimal.ZERO) > 0
+                    && paid.setScale(0, RoundingMode.DOWN).compareTo(due.setScale(0, RoundingMode.DOWN)) < 0) {
+                continue;
+            }
+            return Optional.of(order);
+        }
+        return Optional.empty();
+    }
+
+    private String sePayBlob(SePayWebhookPayload payload) {
+        return ((payload.getOrderId() == null ? "" : payload.getOrderId()) + " "
+                + (payload.getCode() == null ? "" : payload.getCode()) + " "
+                + (payload.getContent() == null ? "" : payload.getContent()) + " "
+                + (payload.getDescription() == null ? "" : payload.getDescription()) + " "
+                + (payload.getReferenceCode() == null ? "" : payload.getReferenceCode())
+                + " " + (payload.getTransactionId() == null ? "" : payload.getTransactionId()));
     }
 
     private String firstNonBlank(String... values) {
@@ -376,12 +510,19 @@ public class CheckoutService {
             String bankName = firstNonBlank(sePayProperties.getBank(), "MBBank");
             String accountName = firstNonBlank(sePayProperties.getAccountName(), "LE VAN HAU");
             String accountNumber = firstNonBlank(sePayProperties.getAccountNumber(), "");
+            String sync = firstNonBlank(sePayGateway.lastMessage(), sePayTransactions.lastMessage());
             bank = new BankTransferDTO(
                     bankName,
                     accountName,
                     accountNumber,
                     order.getOrderCode(),
-                    qrUrl(order));
+                    qrUrl(order),
+                    sync);
+        }
+        SePayGatewayDTO gateway = null;
+        if ("PENDING".equalsIgnoreCase(order.getStatus())
+                && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
+            gateway = sePayGateway.checkoutForm(order);
         }
         return new CheckoutDTO(
                 order.getId(),
@@ -394,7 +535,44 @@ public class CheckoutService {
                 order.getCurrency(),
                 payment.getCheckoutUrl(),
                 bank,
+                gateway,
                 items);
+    }
+
+    private SePayWebhookPayload toWebhookPayload(tools.jackson.databind.JsonNode body) {
+        SePayWebhookPayload payload = new SePayWebhookPayload();
+        payload.setId(textNode(body, "id"));
+        payload.setOrderId(firstNonBlank(textNode(body, "order_id"), textNode(body, "orderId")));
+        payload.setTransactionId(firstNonBlank(textNode(body, "transaction_id"), textNode(body, "transactionId")));
+        payload.setStatus(textNode(body, "status"));
+        payload.setGateway(textNode(body, "gateway"));
+        payload.setTransactionDate(textNode(body, "transaction_date"));
+        payload.setAccountNumber(textNode(body, "account_number"));
+        payload.setCode(textNode(body, "code"));
+        payload.setContent(firstNonBlank(textNode(body, "content"), textNode(body, "transaction_content")));
+        payload.setTransferType(textNode(body, "transfer_type"));
+        payload.setReferenceCode(textNode(body, "reference_code"));
+        payload.setDescription(textNode(body, "description"));
+        String amount = firstNonBlank(textNode(body, "transfer_amount"), textNode(body, "amount"));
+        if (!amount.isBlank()) {
+            try {
+                payload.setTransferAmount(new BigDecimal(amount.replace(",", "")));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return payload;
+    }
+
+    private String textNode(tools.jackson.databind.JsonNode node, String field) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return "";
+        }
+        tools.jackson.databind.JsonNode value = node.get(field);
+        if (value == null || value.isNull() || value.isMissingNode()) {
+            return "";
+        }
+        String text = value.asString("");
+        return text == null ? "" : text.trim();
     }
 
     private CheckoutItemDTO toItemDto(OrderItem item) {

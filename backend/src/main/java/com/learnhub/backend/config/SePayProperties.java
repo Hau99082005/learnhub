@@ -6,6 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class SePayProperties {
     private String apiToken = "";
     private String webhookApiKey = "";
+    private String ipnSecret = "";
+    private String merchantId = "";
+    private String checkoutUrl = "https://pay.sepay.vn/v1/checkout/init";
+    private String pgApiUrl = "https://pgapi.sepay.vn";
+    private String frontendBaseUrl = "http://localhost:5173";
     private String bank = "MBBank";
     private String accountNumber = "";
     private String accountName = "";
@@ -27,6 +32,52 @@ public class SePayProperties {
 
     public void setWebhookApiKey(String webhookApiKey) {
         this.webhookApiKey = webhookApiKey == null ? "" : webhookApiKey;
+    }
+
+    public String getIpnSecret() {
+        return ipnSecret;
+    }
+
+    public void setIpnSecret(String ipnSecret) {
+        this.ipnSecret = ipnSecret == null ? "" : ipnSecret;
+    }
+
+    public String getMerchantId() {
+        return merchantId;
+    }
+
+    public void setMerchantId(String merchantId) {
+        this.merchantId = merchantId == null ? "" : merchantId;
+    }
+
+    public String getCheckoutUrl() {
+        return checkoutUrl;
+    }
+
+    public void setCheckoutUrl(String checkoutUrl) {
+        this.checkoutUrl = checkoutUrl == null || checkoutUrl.isBlank()
+                ? "https://pay.sepay.vn/v1/checkout/init"
+                : checkoutUrl;
+    }
+
+    public String getPgApiUrl() {
+        return pgApiUrl;
+    }
+
+    public void setPgApiUrl(String pgApiUrl) {
+        this.pgApiUrl = pgApiUrl == null || pgApiUrl.isBlank()
+                ? "https://pgapi.sepay.vn"
+                : pgApiUrl;
+    }
+
+    public String getFrontendBaseUrl() {
+        return frontendBaseUrl;
+    }
+
+    public void setFrontendBaseUrl(String frontendBaseUrl) {
+        this.frontendBaseUrl = frontendBaseUrl == null || frontendBaseUrl.isBlank()
+                ? "http://localhost:5173"
+                : frontendBaseUrl.trim().replaceAll("/+$", "");
     }
 
     public String getBank() {

@@ -30,6 +30,12 @@ public class CheckoutController {
         return ResponseEntity.status(HttpStatus.CREATED).body(checkoutService.create(authorization, request));
     }
 
+    @GetMapping("/current")
+    public ResponseEntity<CheckoutDTO> current(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(checkoutService.latest(authorization));
+    }
+
     @GetMapping("/{orderCode}")
     public ResponseEntity<CheckoutDTO> get(
             @RequestHeader(value = "Authorization", required = false) String authorization,

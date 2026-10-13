@@ -8,6 +8,10 @@ export async function getCheckout(orderCode) {
   return authGet(`/api/checkout/${encodeURIComponent(orderCode)}`);
 }
 
+export async function getCurrentCheckout() {
+  return authGet("/api/checkout/current");
+}
+
 export async function confirmCheckout(orderCode) {
   return authPost(`/api/checkout/${encodeURIComponent(orderCode)}/confirm`);
 }

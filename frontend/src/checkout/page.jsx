@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShoppingBag } from "lucide-react";
+import { Check, Copy, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { formatMoney } from "@/components/Course";
 import { getAuthUser } from "@/lib/auth";
@@ -31,6 +31,65 @@ const METHODS = [
     logo: bankLogo,
   },
 ];
+
+function isPaid(order) {
+  if (!order) {
+    return false;
+  }
+  return (
+    String(order.status || "").toUpperCase() === "PAID" &&
+    String(order.paymentStatus || "").toUpperCase() === "SUCCEEDED"
+  );
+}
+
+function paymentQuery() {
+  return new URLSearchParams(window.location.search).get("payment") || "";
+}
+
+function gatewayFieldRows(fields) {
+  if (Array.isArray(fields)) {
+    return fields
+      .map((row) => [
+        row?.name || row?.key || "",
+        row?.value == null ? "" : String(row.value),
+      ])
+      .filter(([name]) => name);
+  }
+  if (fields && typeof fields === "object") {
+    return Object.entries(fields).map(([name, value]) => [
+      name,
+      value == null ? "" : String(value),
+    ]);
+  }
+  return [];
+}
+
+function submitSePayGateway(order, target) {
+  const action = order?.gateway?.action;
+  const rows = gatewayFieldRows(order?.gateway?.fields);
+  if (!action || !rows.length) {
+    return false;
+  }
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = action;
+  form.acceptCharset = "UTF-8";
+  form.style.display = "none";
+  if (target) {
+    form.target = target;
+  }
+  rows.forEach(([name, value]) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+  window.setTimeout(() => form.remove(), 0);
+  return true;
+}
 
 function orderCodeFromPath() {
   const parts = window.location.pathname.split("/").filter(Boolean);
@@ -245,7 +304,19 @@ function MethodPicker({ selected, onSelect }) {
 }
 
 function PayGuide({ order }) {
-  if (order.status === "PAID") {
+  if (paymentQuery() === "success" && !isPaid(order)) {
+    return (
+      <div className="border border-border px-4 py-8 text-center sm:px-6">
+        <p className="text-base font-semibold" style={fieldStyle}>
+          Đang xác nhận thanh toán
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          SePay đã nhận giao dịch. Hệ thống đang lưu đơn rồi chuyển vào học tập.
+        </p>
+      </div>
+    );
+  }
+  if (isPaid(order)) {
     return (
       <div className="border border-emerald-600/40 bg-emerald-600/10 px-4 py-5">
         <p className="text-base font-semibold text-emerald-500">
@@ -264,15 +335,66 @@ function PayGuide({ order }) {
       </div>
     );
   }
-  if (order.provider === "BANK_TRANSFER" && order.bankTransfer?.qrUrl) {
+  if (order.provider === "BANK_TRANSFER" && order.bankTransfer) {
+    const bank = order.bankTransfer;
+    const copy = (value) => {
+      if (!value) {
+        return;
+      }
+      navigator.clipboard?.writeText(String(value)).then(
+        () => toast.success("Đã sao chép"),
+        () => {},
+      );
+    };
     return (
-      <div className="flex justify-center border border-border p-4 sm:p-6">
-        <img
-          src={order.bankTransfer.qrUrl}
-          alt=""
-          className="w-full max-w-[16rem] bg-white p-2"
-          style={{ borderRadius: "5px" }}
-        />
+      <div className="border border-border p-4 sm:p-6">
+        <p className="text-sm font-medium" style={fieldStyle}>
+          Quét QR hoặc chuyển khoản đúng nội dung bên dưới
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          SePay chỉ nhận được tiền khi đúng số tài khoản đã liên kết.
+        </p>
+        {bank.qrUrl ? (
+          <div className="mt-4 flex justify-center">
+            <img
+              src={bank.qrUrl}
+              alt=""
+              className="w-full max-w-[16rem] bg-white p-2"
+              style={{ borderRadius: "5px" }}
+            />
+          </div>
+        ) : null}
+        <dl className="mt-4 space-y-2 text-sm">
+          {[
+            ["Ngân hàng", bank.bankName],
+            ["Chủ tài khoản", bank.accountName],
+            ["Số tài khoản", bank.accountNumber],
+            ["Số tiền", formatMoney(order.totalAmount, order.currency)],
+            ["Nội dung CK", bank.transferContent || order.orderCode],
+          ].map(([label, value]) => (
+            <div key={label} className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="font-medium break-all">{value}</dd>
+              </div>
+              <button
+                type="button"
+                onClick={() => copy(value)}
+                className="mt-1 inline-flex size-8 shrink-0 items-center justify-center border border-border text-muted-foreground hover:text-foreground"
+                style={{ borderRadius: "5px" }}
+                aria-label={`Sao chép ${label}`}
+              >
+                <Copy className="size-3.5" />
+              </button>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-4 text-sm text-violet-700">
+          Sau khi chuyển khoản thành công, trang sẽ tự xác nhận và chuyển sang học tập.
+        </p>
+        {bank.syncMessage ? (
+          <p className="mt-2 text-sm text-amber-500">{bank.syncMessage}</p>
+        ) : null}
       </div>
     );
   }
@@ -316,9 +438,16 @@ function CheckoutStart() {
     try {
       const order = await createCheckout(provider);
       await loadCart();
-      window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
+      if (isPaid(order)) {
+        toast.message("Bạn đã sở hữu khóa học trong đơn này");
+        window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
+        return;
+      }
+      const pay = order?.gateway?.action ? "?pay=1" : "";
+      window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}${pay}`;
     } catch (error) {
-      toast.error(error.message || "Không thể tạo đơn thanh toán");
+      const message = error.message || "Không thể tạo đơn thanh toán";
+      toast.error(message);
       setSubmitting(false);
     }
   };
@@ -445,64 +574,108 @@ function CheckoutOrder({ orderCode }) {
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
   const paidRef = useRef(false);
+  const noticeRef = useRef(false);
+  const openedRef = useRef(false);
+  const seenPendingRef = useRef(false);
 
   useEffect(() => {
-    getCheckout(orderCode)
-      .then((next) => {
-        if (next?.status === "PAID") {
-          paidRef.current = true;
-        }
-        setOrder(next);
-      })
-      .catch((err) => setError(err.message || "Không tìm thấy đơn hàng"));
-  }, [orderCode]);
+    const result = paymentQuery();
+    if (noticeRef.current) {
+      return;
+    }
+    if (result === "cancel") {
+      noticeRef.current = true;
+      toast.message("Bạn đã hủy thanh toán SePay");
+    } else if (result === "error") {
+      noticeRef.current = true;
+      toast.error("Thanh toán SePay chưa thành công");
+    }
+  }, []);
 
   useEffect(() => {
-    if (!orderCode || error) {
+    if (!order || isPaid(order) || openedRef.current) {
+      return;
+    }
+    if (new URLSearchParams(window.location.search).get("pay") !== "1") {
+      return;
+    }
+    if (!order.gateway?.action) {
+      return;
+    }
+    openedRef.current = true;
+    submitSePayGateway(order);
+  }, [order]);
+
+  useEffect(() => {
+    if (!orderCode) {
       return undefined;
     }
     let stopped = false;
     let timer = 0;
+    const returning = paymentQuery() === "success";
     const tick = async () => {
       try {
-        const next = await getCheckout(orderCode);
+        const next = returning
+          ? await confirmCheckout(orderCode)
+          : await getCheckout(orderCode);
         if (stopped) {
           return;
         }
-        if (next?.status === "PAID" && !paidRef.current) {
+        if (!isPaid(next)) {
+          seenPendingRef.current = true;
+          setOrder(next);
+          return;
+        }
+        setOrder(next);
+        const justPaid = seenPendingRef.current || returning;
+        if (justPaid && !paidRef.current) {
           paidRef.current = true;
           addOwnedMany((next.items || []).map((item) => item.courseId));
           await loadCart();
           toast.success("Thanh toán thành công");
-        }
-        setOrder(next);
-        if (next?.status === "PAID") {
+          window.setTimeout(() => {
+            window.location.replace("/hoc-tap");
+          }, 400);
           stopped = true;
           window.clearInterval(timer);
         }
-      } catch {
-        return;
+      } catch (err) {
+        if (!stopped && !returning) {
+          setError(err.message || "Không tìm thấy đơn hàng");
+        }
       }
     };
     tick();
-    timer = window.setInterval(tick, 500);
+    timer = window.setInterval(tick, 2000);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [orderCode, error]);
+  }, [orderCode]);
 
   const confirm = async () => {
     setConfirming(true);
     try {
       const next = await confirmCheckout(orderCode);
+      setOrder(next);
+      if (!isPaid(next)) {
+        toast.message("Chưa khớp được giao dịch, hệ thống đang đối chiếu lại");
+        return;
+      }
       paidRef.current = true;
       addOwnedMany((next.items || []).map((item) => item.courseId));
       await loadCart();
-      setOrder(next);
       toast.success("Thanh toán thành công");
+      window.setTimeout(() => {
+        window.location.replace("/hoc-tap");
+      }, 900);
     } catch (err) {
-      toast.error(err.message || "Không thể xác nhận thanh toán");
+      const message = err.message || "Không thể xác nhận thanh toán";
+      if (String(message).toLowerCase().includes("conflict") || String(message).includes("SePay")) {
+        toast.message("Chưa khớp được giao dịch, hệ thống đang đối chiếu lại");
+        return;
+      }
+      toast.error(message);
     } finally {
       setConfirming(false);
     }
@@ -532,7 +705,8 @@ function CheckoutOrder({ orderCode }) {
     );
   }
 
-  const paid = order.status === "PAID";
+  const paid = isPaid(order);
+  const returning = paymentQuery() === "success";
 
   return (
     <section className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 sm:py-12">
@@ -552,16 +726,32 @@ function CheckoutOrder({ orderCode }) {
       >
         <div className="space-y-4">
           <PayGuide order={order} />
-          {!paid && order.provider !== "BANK_TRANSFER" ? (
-            <button
-              type="button"
-              disabled={confirming}
-              onClick={confirm}
-              className="inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 disabled:opacity-70 sm:w-auto sm:px-8"
-              style={{ border: "none", borderRadius: "5px" }}
-            >
-              {confirming ? "Đang xác nhận..." : "Tôi đã thanh toán"}
-            </button>
+          {!paid && !returning ? (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              {order.gateway?.action ? (
+                <button
+                  type="button"
+                  onClick={() => submitSePayGateway(order)}
+                  className="inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 sm:w-auto sm:px-8"
+                  style={{ border: "none", borderRadius: "5px" }}
+                >
+                  Thanh toán qua SePay
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={confirming}
+                onClick={confirm}
+                className="inline-flex h-11 w-full items-center justify-center border border-border bg-background text-sm font-medium transition hover:bg-muted disabled:opacity-70 sm:w-auto sm:px-8"
+                style={{ borderRadius: "5px" }}
+              >
+                {confirming
+                  ? "Đang kiểm tra..."
+                  : order.provider === "BANK_TRANSFER"
+                    ? "Kiểm tra thanh toán"
+                    : "Tôi đã thanh toán"}
+              </button>
+            </div>
           ) : null}
         </div>
         <Summary

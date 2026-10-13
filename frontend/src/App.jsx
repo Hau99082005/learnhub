@@ -17,6 +17,7 @@ import LoginPage from "@/login/page"
 import RegisterPage from "@/Register/page"
 import CartPage from "@/cart/page"
 import CheckoutPage from "@/checkout/page"
+import PurchaseHistoryPage from "@/purchases/page"
 import LearningPage from "@/learning/page"
 import CoursePlayerPage from "@/learn/page"
 import { Toaster } from "@/components/ui/sonner"
@@ -116,6 +117,8 @@ function App() {
             <LearningPage />
           ) : path === "/thanh-toan" || path.startsWith("/thanh-toan/") ? (
             <CheckoutPage />
+          ) : path === "/lich-su-mua" ? (
+            <PurchaseHistoryPage />
           ) : path === "/gioi-thieu" ? (
             <About />
           ) : path === "/tin-tuc" || path.startsWith("/tin-tuc/") ? (

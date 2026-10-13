@@ -12,6 +12,10 @@ export async function getCurrentCheckout() {
   return authGet("/api/checkout/current");
 }
 
+export async function listPurchases() {
+  return authGet("/api/checkout/history");
+}
+
 export async function confirmCheckout(orderCode) {
   return authPost(`/api/checkout/${encodeURIComponent(orderCode)}/confirm`);
 }

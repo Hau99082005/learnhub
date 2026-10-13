@@ -20,5 +20,8 @@ public interface ShopOrderRepository extends JpaRepository<ShopOrder, Long> {
     @EntityGraph(attributePaths = "user")
     List<ShopOrder> findTop20ByUser_IdOrderByIdDesc(Long userId);
 
+    @EntityGraph(attributePaths = "user")
+    List<ShopOrder> findTop100ByUser_IdAndStatusOrderByIdDesc(Long userId, String status);
+
     boolean existsByOrderCode(String orderCode);
 }

@@ -23,6 +23,7 @@ import com.learnhub.backend.modules.cart.dtos.BankTransferDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutItemDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutRequest;
+import com.learnhub.backend.modules.cart.dtos.PurchaseHistoryDTO;
 import com.learnhub.backend.modules.cart.dtos.SePayGatewayDTO;
 import com.learnhub.backend.modules.cart.dtos.SePayWebhookPayload;
 import com.learnhub.backend.modules.cart.models.Cart;
@@ -156,6 +157,14 @@ public class CheckoutService {
             matchFromSePay(order, payment);
         }
         return toDto(order, payment);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PurchaseHistoryDTO> history(String authorization) {
+        user account = userServices.requireAccount(authorization);
+        return orders.findTop100ByUser_IdAndStatusOrderByIdDesc(account.getId(), "PAID").stream()
+                .map(this::toHistoryDto)
+                .toList();
     }
 
     @Transactional
@@ -573,6 +582,24 @@ public class CheckoutService {
         }
         String text = value.asString("");
         return text == null ? "" : text.trim();
+    }
+
+    private PurchaseHistoryDTO toHistoryDto(ShopOrder order) {
+        Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
+        List<CheckoutItemDTO> items = orderItems.findByOrderIdWithCourse(order.getId()).stream()
+                .map(this::toItemDto)
+                .toList();
+        return new PurchaseHistoryDTO(
+                order.getId(),
+                order.getOrderCode(),
+                order.getStatus(),
+                payment == null ? "" : payment.getProvider(),
+                payment == null ? "" : payment.getStatus(),
+                order.getTotalAmount(),
+                order.getCurrency(),
+                order.getPaidAt(),
+                order.getCreatedAt(),
+                items);
     }
 
     private CheckoutItemDTO toItemDto(OrderItem item) {

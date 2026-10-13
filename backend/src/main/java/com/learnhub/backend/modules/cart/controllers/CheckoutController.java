@@ -10,8 +10,11 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 import com.learnhub.backend.modules.cart.dtos.CheckoutDTO;
 import com.learnhub.backend.modules.cart.dtos.CheckoutRequest;
+import com.learnhub.backend.modules.cart.dtos.PurchaseHistoryDTO;
 import com.learnhub.backend.modules.cart.services.CheckoutService;
 
 @RestController
@@ -28,6 +31,12 @@ public class CheckoutController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody(required = false) CheckoutRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(checkoutService.create(authorization, request));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<PurchaseHistoryDTO>> history(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(checkoutService.history(authorization));
     }
 
     @GetMapping("/current")

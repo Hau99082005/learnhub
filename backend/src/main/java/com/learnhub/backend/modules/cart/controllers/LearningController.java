@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.learnhub.backend.modules.cart.dtos.CoursePlayerDTO;
@@ -27,8 +28,9 @@ public class LearningController {
 
     @GetMapping
     public ResponseEntity<List<LearningItemDTO>> mine(
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
-        return ResponseEntity.ok(learningService.listMine(authorization));
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam(value = "q", required = false) String query) {
+        return ResponseEntity.ok(learningService.listMine(authorization, query));
     }
 
     @GetMapping("/courses/{slug}")

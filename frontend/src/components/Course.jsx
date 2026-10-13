@@ -489,17 +489,35 @@ function CourseFallback() {
 }
 
 function CourseGridView() {
-  const items = use(getData());
-  const [wished, setWished] = useState(() => new Set());
   const query = new URLSearchParams(window.location.search).get("q")?.trim() || "";
-  const needle = query.toLowerCase();
-  const visible = needle
-    ? items.filter((item) =>
-        [item.title, item.subtitle, item.description]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(needle)),
-      )
-    : items;
+  const [items, setItems] = useState([]);
+  const [ready, setReady] = useState(false);
+  const [wished, setWished] = useState(() => new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    const path = query ? `/api/courses?q=${encodeURIComponent(query)}` : "/api/courses";
+    fetch(path)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+        setItems(Array.isArray(data) ? data : []);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setItems([]);
+          setReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  const visible = items;
 
   const toggleWish = (id) => {
     setWished((prev) => {
@@ -523,11 +541,25 @@ function CourseGridView() {
           Các khóa học
         </h1>
         <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-          {query
-            ? `${visible.length} kết quả cho “${query}”`
-            : `${items.length} khóa học đang mở`}
+          {!ready
+            ? "Đang tìm khóa học..."
+            : query
+              ? `${visible.length} kết quả cho “${query}”`
+              : `${items.length} khóa học đang mở`}
         </p>
-        {visible.length === 0 ? (
+        {!ready ? (
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="overflow-hidden border border-border">
+                <div className="aspect-[16/9] animate-pulse bg-muted" />
+                <div className="space-y-3 p-4">
+                  <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : visible.length === 0 ? (
           <p className="mt-10 text-muted-foreground">
             {query ? "Không tìm thấy khóa học phù hợp." : "Chưa có khóa học xuất bản."}
           </p>

@@ -246,27 +246,34 @@ const LearningPage = () => {
     let cancelled = false;
     recordStreakVisit();
     setStreak(getStreak());
-    authGet("/api/learning")
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
-        const rows = Array.isArray(data) ? data : [];
-        setItems(rows);
-        addOwnedMany(rows.map((row) => row.courseId));
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) {
-          return;
-        }
-        setError(err.message || "Không tải được khóa học");
-        setLoading(false);
-      });
+    const handle = window.setTimeout(() => {
+      const term = query.trim();
+      const path = term
+        ? `/api/learning?q=${encodeURIComponent(term)}`
+        : "/api/learning";
+      authGet(path)
+        .then((data) => {
+          if (cancelled) {
+            return;
+          }
+          const rows = Array.isArray(data) ? data : [];
+          setItems(rows);
+          addOwnedMany(rows.map((row) => row.courseId));
+          setLoading(false);
+        })
+        .catch((err) => {
+          if (cancelled) {
+            return;
+          }
+          setError(err.message || "Không tải được khóa học");
+          setLoading(false);
+        });
+    }, query.trim() ? 280 : 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(handle);
     };
-  }, [user]);
+  }, [user, query]);
 
   const categories = useMemo(() => {
     const names = [
@@ -286,7 +293,6 @@ const LearningPage = () => {
     const archived = new Set(archivedIds);
     const wished = new Set(wishlistIds);
     const access = getLastAccessMap();
-    const needle = query.trim().toLowerCase();
     let rows = items.filter((item) => {
       const isArchived = archived.has(Number(item.courseId));
       if (tab === "archived") {
@@ -306,13 +312,6 @@ const LearningPage = () => {
       }
       return true;
     });
-    if (needle) {
-      rows = rows.filter((item) =>
-        [item.title, item.instructorName, item.categoryName]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(needle)),
-      );
-    }
     if (category !== "all") {
       rows = rows.filter((item) => item.categoryName === category);
     }
@@ -350,7 +349,6 @@ const LearningPage = () => {
     instructor,
     items,
     progressFilter,
-    query,
     sort,
     tab,
     wishlistIds,

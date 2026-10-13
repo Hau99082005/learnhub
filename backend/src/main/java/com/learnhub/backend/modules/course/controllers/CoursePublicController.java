@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.learnhub.backend.modules.course.dtos.CourseAdminDTO;
@@ -21,8 +22,9 @@ public class CoursePublicController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CourseAdminDTO>> list() {
-        return ResponseEntity.ok(courseServices.listPublished());
+    public ResponseEntity<List<CourseAdminDTO>> list(
+            @RequestParam(value = "q", required = false) String query) {
+        return ResponseEntity.ok(courseServices.listPublished(query));
     }
 
     @GetMapping("/{slug}")

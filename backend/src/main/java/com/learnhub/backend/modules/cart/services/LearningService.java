@@ -46,8 +46,16 @@ public class LearningService {
 
     @Transactional(readOnly = true)
     public List<LearningItemDTO> listMine(String authorization) {
+        return listMine(authorization, "");
+    }
+
+    @Transactional(readOnly = true)
+    public List<LearningItemDTO> listMine(String authorization, String query) {
         user account = userServices.requireAccount(authorization);
-        List<Enrollment> rows = enrollments.findByUserIdOrderByEnrolledAtDesc(account.getId());
+        String term = query == null ? "" : query.trim();
+        List<Enrollment> rows = term.isBlank()
+                ? enrollments.findByUserIdOrderByEnrolledAtDesc(account.getId())
+                : enrollments.searchByUserId(account.getId(), term);
         if (rows.isEmpty()) {
             return List.of();
         }

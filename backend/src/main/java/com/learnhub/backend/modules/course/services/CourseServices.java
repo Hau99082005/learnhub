@@ -69,9 +69,16 @@ public class CourseServices {
 
     @Transactional(readOnly = true)
     public List<CourseAdminDTO> listPublished() {
-        return courses.findByDeletedAtIsNullAndStatusOrderByPublishedAtDesc("PUBLISHED").stream()
-                .map(this::toAdminDto)
-                .toList();
+        return listPublished("");
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseAdminDTO> listPublished(String query) {
+        String term = query == null ? "" : query.trim();
+        List<Course> rows = term.isBlank()
+                ? courses.findByDeletedAtIsNullAndStatusOrderByPublishedAtDesc("PUBLISHED")
+                : courses.searchPublished("PUBLISHED", term);
+        return rows.stream().map(this::toAdminDto).toList();
     }
 
     @Transactional(readOnly = true)

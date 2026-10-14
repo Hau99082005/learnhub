@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { AllCourse } from "@/admin/courses/AllCourse";
 import CourseRecord from "@/instructor/CourseRecord";
+import Performance from "@/instructor/Performance";
 import { getAuthUser } from "@/lib/auth";
 import { isInstructor, isAdmin } from "@/lib/roles";
 import InstructorLayout from "@/instructor/layout";
@@ -23,10 +24,6 @@ const InstructorPage = () => {
       title: "Giao tiếp",
       text: "Tin nhắn và hỏi đáp từ học viên sẽ hiện ở đây khi khóa học bắt đầu chạy.",
     },
-    "/giang-day/quan-tri/hieu-suat": {
-      title: "Hiệu suất",
-      text: "Lượt xem, đăng ký và đánh giá khóa học sẽ được tổng hợp tại đây.",
-    },
     "/giang-day/quan-tri/cong-cu": {
       title: "Công cụ",
       text: "Checklist ghi hình, mẫu mô tả và công cụ xuất bản sẽ lần lượt được mở.",
@@ -42,6 +39,14 @@ const InstructorPage = () => {
     return (
       <InstructorLayout>
         <CourseRecord />
+      </InstructorLayout>
+    );
+  }
+
+  if (section === "/giang-day/quan-tri/hieu-suat") {
+    return (
+      <InstructorLayout>
+        <Performance />
       </InstructorLayout>
     );
   }

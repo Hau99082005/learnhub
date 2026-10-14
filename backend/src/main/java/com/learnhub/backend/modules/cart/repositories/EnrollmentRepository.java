@@ -1,5 +1,7 @@
 package com.learnhub.backend.modules.cart.repositories;
 
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,4 +37,19 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
             order by e.enrolledAt desc
             """)
     List<Enrollment> searchByUserId(@Param("userId") Long userId, @Param("q") String q);
+
+    List<Enrollment> findByCourseIdIn(Collection<Long> courseIds);
+
+    long countByCourseIdIn(Collection<Long> courseIds);
+
+    @Query("""
+            select count(e) from Enrollment e
+            where e.courseId in :courseIds
+              and coalesce(e.enrolledAt, e.createdAt) >= :start
+              and coalesce(e.enrolledAt, e.createdAt) < :end
+            """)
+    long countByCourseIdInAndEnrolledBetween(
+            @Param("courseIds") Collection<Long> courseIds,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }

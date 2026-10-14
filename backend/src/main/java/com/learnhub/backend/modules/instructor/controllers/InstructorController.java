@@ -10,16 +10,22 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.learnhub.backend.modules.instructor.dtos.InstructorOnboardingDTO;
 import com.learnhub.backend.modules.instructor.dtos.InstructorOnboardingRequest;
+import com.learnhub.backend.modules.instructor.dtos.InstructorPerformanceDTO;
 import com.learnhub.backend.modules.instructor.dtos.InstructorStudioDTO;
+import com.learnhub.backend.modules.instructor.services.InstructorPerformanceService;
 import com.learnhub.backend.modules.instructor.services.InstructorServices;
 
 @RestController
 @RequestMapping("/api/instructor")
 public class InstructorController {
     private final InstructorServices instructorServices;
+    private final InstructorPerformanceService performanceService;
 
-    public InstructorController(InstructorServices instructorServices) {
+    public InstructorController(
+            InstructorServices instructorServices,
+            InstructorPerformanceService performanceService) {
         this.instructorServices = instructorServices;
+        this.performanceService = performanceService;
     }
 
     @GetMapping("/onboarding")
@@ -39,5 +45,11 @@ public class InstructorController {
     public ResponseEntity<InstructorStudioDTO> studio(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         return ResponseEntity.ok(instructorServices.studio(authorization));
+    }
+
+    @GetMapping("/performance")
+    public ResponseEntity<InstructorPerformanceDTO> performance(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(performanceService.stats(authorization));
     }
 }

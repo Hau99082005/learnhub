@@ -228,9 +228,11 @@ function UserMenu({ user, cartItems = 0, wishItems = 0, unread = 0 }) {
         <UserMenuLink href="/danh-sach-mong-uoc" count={wishItems}>
           Danh sách mong ước
         </UserMenuLink>
-        <UserMenuLink href="/giang-day">Giảng dạy trên LearnHub</UserMenuLink>
         {isInstructor(user) ? (
-          <UserMenuLink href="/giang-day/quan-tri">Quản lý khóa học</UserMenuLink>
+          <>
+            <UserMenuLink href="/giang-day">Giảng dạy trên LearnHub</UserMenuLink>
+            <UserMenuLink href="/giang-day/quan-tri">Quản lý khóa học</UserMenuLink>
+          </>
         ) : null}
         <DropdownMenuSeparator />
         <UserMenuLink href="/thong-bao" count={unread}>
@@ -242,8 +244,6 @@ function UserMenu({ user, cartItems = 0, wishItems = 0, unread = 0 }) {
         <UserMenuLink href="/phuong-thuc-thanh-toan">
           Phương thức thanh toán
         </UserMenuLink>
-        <UserMenuLink href="/thue-bao">Thuê bao</UserMenuLink>
-        <UserMenuLink href="/uu-dai">Ưu đãi LearnHub</UserMenuLink>
         <UserMenuLink href="/lich-su-mua">Lịch sử mua</UserMenuLink>
         <DropdownMenuSeparator />
         <div className="flex items-center justify-between px-2 py-2 text-[14px]">
@@ -522,18 +522,20 @@ const Header = () => {
                     </SheetClose>
                   </li>
                 ) : null}
-                <li>
-                  <SheetClose
-                    render={
-                      <a
-                        href="/giang-day"
-                        className="flex h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      />
-                    }
-                  >
-                    Giảng dạy
-                  </SheetClose>
-                </li>
+                {isInstructor(user) ? (
+                  <li>
+                    <SheetClose
+                      render={
+                        <a
+                          href="/giang-day"
+                          className="flex h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        />
+                      }
+                    >
+                      Giảng dạy
+                    </SheetClose>
+                  </li>
+                ) : null}
               </ul>
             </nav>
             {user ? (
@@ -614,12 +616,14 @@ const Header = () => {
               Học tập
             </a>
           ) : null}
-          <a
-            href="/giang-day"
-            className="hidden h-10 items-center px-2 text-sm font-medium text-foreground transition-colors hover:text-violet-700 lg:inline-flex"
-          >
-            Giảng dạy
-          </a>
+          {isInstructor(user) ? (
+            <a
+              href="/giang-day"
+              className="hidden h-10 items-center px-2 text-sm font-medium text-foreground transition-colors hover:text-violet-700 lg:inline-flex"
+            >
+              Giảng dạy
+            </a>
+          ) : null}
 
           <Button
             type="button"

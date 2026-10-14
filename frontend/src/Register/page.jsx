@@ -16,6 +16,9 @@ import {
   clearTeachStart,
   fromTeachFlow,
   readTeachStartAnswers,
+  readTeachStartPayload,
+  isTeachStartComplete,
+  readTeachStartState,
 } from "@/lib/teachStart";
 
 const Page = () => {
@@ -53,7 +56,8 @@ const Page = () => {
     }
     setLoading(true);
     try {
-      const onboarding = readTeachStartAnswers();
+      const onboarding = readTeachStartPayload();
+      const complete = isTeachStartComplete(readTeachStartState().answers);
       const teach = fromTeachFlow();
       const data = await authRequest("/api/auth/register", {
         name: values.name.trim(),
@@ -64,9 +68,15 @@ const Page = () => {
         ...(onboarding || {}),
       });
       saveAuth(data);
-      clearTeachStart();
+      if (complete) {
+        clearTeachStart();
+      }
       setPendingToast("success", "Đăng ký thành công");
-      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : safeNextPath("/");
+      window.location.href = complete
+        ? INSTRUCTOR_STUDIO
+        : teach
+          ? "/giang-day/bat-dau"
+          : safeNextPath("/");
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -224,11 +234,13 @@ const Page = () => {
       </form>
       <SocialAuth
         role={fromTeachFlow() ? ROLES.INSTRUCTOR : values.role}
-        extraBody={readTeachStartAnswers() || {}}
+        extraBody={readTeachStartPayload() || {}}
         redirectTo={
-          fromTeachFlow() || values.role === ROLES.INSTRUCTOR
+          readTeachStartAnswers()
             ? INSTRUCTOR_STUDIO
-            : safeNextPath("/")
+            : fromTeachFlow()
+              ? "/giang-day/bat-dau"
+              : safeNextPath("/")
         }
         onBeforeGoogle={() => (agree ? "" : "Vui lòng đồng ý với điều khoản")}
       />

@@ -60,11 +60,21 @@ public class InstructorServices {
         this.courses = courses;
     }
 
+    @Transactional(readOnly = true)
+    public InstructorOnboardingDTO getOnboarding(String authorization) {
+        user account = requireAccount(authorization);
+        return onboardings.findByUserId(account.getId())
+                .map(this::toOnboardingDto)
+                .orElse(new InstructorOnboardingDTO(null, "", "", "", false));
+    }
+
     @Transactional
     public InstructorOnboardingDTO saveOnboarding(String authorization, InstructorOnboardingRequest request) {
         user account = requireAccount(authorization);
         InstructorOnboardingDTO saved = upsertForAccount(account, request);
-        promoteInstructor(account);
+        if (saved.isCompleted()) {
+            promoteInstructor(account);
+        }
         return saved;
     }
 
@@ -76,21 +86,36 @@ public class InstructorServices {
         String teaching = normalize(request == null ? null : request.getTeachingFormat());
         String recording = normalize(request == null ? null : request.getRecordingExperience());
         String audience = normalize(request == null ? null : request.getAudienceSize());
-        if (!TEACHING.contains(teaching)) {
+        if (teaching.isBlank() && recording.isBlank() && audience.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng chọn ít nhất một câu trả lời");
+        }
+        if (!teaching.isBlank() && !TEACHING.contains(teaching)) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng chọn hình thức giảng dạy", "teachingFormat");
         }
-        if (!RECORDING.contains(recording)) {
+        if (!recording.isBlank() && !RECORDING.contains(recording)) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng chọn mức độ ghi hình", "recordingExperience");
         }
-        if (!AUDIENCE.contains(audience)) {
+        if (!audience.isBlank() && !AUDIENCE.contains(audience)) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng chọn phạm vi tiếp cận", "audienceSize");
         }
 
         InstructorOnboarding row = onboardings.findByUserId(account.getId()).orElseGet(InstructorOnboarding::new);
         row.setUser(account);
-        row.setTeachingFormat(teaching);
-        row.setRecordingExperience(recording);
-        row.setAudienceSize(audience);
+        if (!teaching.isBlank()) {
+            row.setTeachingFormat(teaching);
+        } else if (row.getTeachingFormat() == null) {
+            row.setTeachingFormat("");
+        }
+        if (!recording.isBlank()) {
+            row.setRecordingExperience(recording);
+        } else if (row.getRecordingExperience() == null) {
+            row.setRecordingExperience("");
+        }
+        if (!audience.isBlank()) {
+            row.setAudienceSize(audience);
+        } else if (row.getAudienceSize() == null) {
+            row.setAudienceSize("");
+        }
         onboardings.save(row);
         return toOnboardingDto(row);
     }
@@ -107,7 +132,9 @@ public class InstructorServices {
             return null;
         }
         InstructorOnboardingDTO saved = upsertForAccount(account, request);
-        promoteInstructor(account);
+        if (saved.isCompleted()) {
+            promoteInstructor(account);
+        }
         return saved;
     }
 
@@ -210,11 +237,18 @@ public class InstructorServices {
     }
 
     private InstructorOnboardingDTO toOnboardingDto(InstructorOnboarding row) {
+        String teaching = normalize(row.getTeachingFormat());
+        String recording = normalize(row.getRecordingExperience());
+        String audience = normalize(row.getAudienceSize());
+        boolean completed = TEACHING.contains(teaching)
+                && RECORDING.contains(recording)
+                && AUDIENCE.contains(audience);
         return new InstructorOnboardingDTO(
                 row.getId(),
-                row.getTeachingFormat(),
-                row.getRecordingExperience(),
-                row.getAudienceSize());
+                teaching,
+                recording,
+                audience,
+                completed);
     }
 
     private CourseDTO toCourseDto(Course course) {

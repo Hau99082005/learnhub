@@ -14,6 +14,9 @@ import {
   clearTeachStart,
   fromTeachFlow,
   readTeachStartAnswers,
+  readTeachStartPayload,
+  isTeachStartComplete,
+  readTeachStartState,
 } from "@/lib/teachStart";
 
 const Page = () => {
@@ -50,14 +53,21 @@ const Page = () => {
         password: values.password,
       });
       saveAuth(data);
-      const onboarding = readTeachStartAnswers();
-      if (onboarding) {
-        await authPost("/api/instructor/onboarding", onboarding);
-        updateAuthUser({ role: "INSTRUCTOR" });
-        clearTeachStart();
+      const payload = readTeachStartPayload();
+      const complete = isTeachStartComplete(readTeachStartState().answers);
+      if (payload) {
+        const saved = await authPost("/api/instructor/onboarding", payload);
+        if (saved?.completed || complete) {
+          updateAuthUser({ role: "INSTRUCTOR" });
+          clearTeachStart();
+        }
       }
       setPendingToast("success", "Đăng nhập thành công");
-      window.location.href = fromTeachFlow() || onboarding ? INSTRUCTOR_STUDIO : safeNextPath("/");
+      window.location.href = complete
+        ? INSTRUCTOR_STUDIO
+        : fromTeachFlow()
+          ? "/giang-day/bat-dau"
+          : safeNextPath("/");
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -157,8 +167,14 @@ const Page = () => {
         </Button>
       </form>
       <SocialAuth
-        extraBody={readTeachStartAnswers() || {}}
-        redirectTo={fromTeachFlow() || readTeachStartAnswers() ? INSTRUCTOR_STUDIO : safeNextPath("/")}
+        extraBody={readTeachStartPayload() || {}}
+        redirectTo={
+          readTeachStartAnswers()
+            ? INSTRUCTOR_STUDIO
+            : fromTeachFlow()
+              ? "/giang-day/bat-dau"
+              : safeNextPath("/")
+        }
       />
     </AuthLayout>
   );

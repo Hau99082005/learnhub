@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { clearAuth, setPendingToast } from "@/lib/auth";
 import { roleLabel } from "@/lib/roles";
+import logoLearnHub from "@/assets/icons/Logo LearnHub (1)-Photoroom.png";
 
 const NAV_GROUPS = [
   {
@@ -221,14 +222,11 @@ function Sidebar({ path }) {
         href="/quan-tri"
         className="flex h-14 items-center gap-2.5 border-b border-border px-4"
       >
-        <span
-          className="flex size-9 items-center justify-center rounded-none bg-sky-600 text-white"
-          style={{
-            borderRadius: "5px",
-          }}
-        >
-          <GraduationCap className="size-6" strokeWidth={1.75} />
-        </span>
+        <img
+          src={logoLearnHub}
+          alt="LearnHub"
+          className="h-9 w-9 bg-transparent object-contain"
+        />
         <span
           className="text-sm font-semibold tracking-tight"
           style={{

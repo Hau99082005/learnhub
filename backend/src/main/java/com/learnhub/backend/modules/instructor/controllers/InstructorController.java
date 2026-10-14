@@ -24,8 +24,14 @@ public class InstructorController {
         this.instructorServices = instructorServices;
     }
 
-    @PostMapping("/onboarding")
+    @GetMapping("/onboarding")
     public ResponseEntity<InstructorOnboardingDTO> onboarding(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(instructorServices.getOnboarding(authorization));
+    }
+
+    @PostMapping("/onboarding")
+    public ResponseEntity<InstructorOnboardingDTO> saveOnboarding(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody InstructorOnboardingRequest request) {
         return ResponseEntity.ok(instructorServices.saveOnboarding(authorization, request));

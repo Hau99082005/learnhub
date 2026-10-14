@@ -5,16 +5,19 @@ public class InstructorOnboardingDTO {
     private final String teachingFormat;
     private final String recordingExperience;
     private final String audienceSize;
+    private final boolean completed;
 
     public InstructorOnboardingDTO(
             Long id,
             String teachingFormat,
             String recordingExperience,
-            String audienceSize) {
+            String audienceSize,
+            boolean completed) {
         this.id = id;
         this.teachingFormat = teachingFormat;
         this.recordingExperience = recordingExperience;
         this.audienceSize = audienceSize;
+        this.completed = completed;
     }
 
     public Long getId() {
@@ -31,5 +34,9 @@ public class InstructorOnboardingDTO {
 
     public String getAudienceSize() {
         return audienceSize;
+    }
+
+    public boolean isCompleted() {
+        return completed;
     }
 }

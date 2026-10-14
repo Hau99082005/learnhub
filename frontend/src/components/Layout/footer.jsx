@@ -1,4 +1,5 @@
-import { GraduationCap, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import logoLearnHub from "@/assets/icons/Logo LearnHub (1)-Photoroom.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFacebookF,
@@ -65,15 +66,11 @@ const Footer = () => {
               href="/"
               className="group inline-flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              <span
-                style={{
-                  border: "1px solid none",
-                  borderRadius: "8px",
-                }}
-                className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background transition-transform duration-300 group-hover:scale-[1.04]"
-              >
-                <GraduationCap className="size-6" strokeWidth={1.75} />
-              </span>
+              <img
+                src={logoLearnHub}
+                alt="LearnHub"
+                className="h-8 w-8 bg-transparent object-contain transition-transform duration-300 group-hover:scale-[1.04]"
+              />
               <span
                 className="text-[16px] font-semibold tracking-tight text-foreground"
                 style={{

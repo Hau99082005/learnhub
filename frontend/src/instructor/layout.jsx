@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ChartNoAxesColumn,
   CircleQuestionMark,
-  GraduationCap,
   Lightbulb,
   LogOut,
   Menu,
@@ -12,6 +11,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import logoLearnHub from "@/assets/icons/Logo LearnHub (1)-Photoroom.png";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -101,7 +101,11 @@ const InstructorLayout = ({ children }) => {
           href="/giang-day/quan-tri"
           className="flex items-center gap-2.5 px-5 py-5"
         >
-          <GraduationCap className="size-7" strokeWidth={1.75} />
+          <img
+            src={logoLearnHub}
+            alt="LearnHub"
+            className="h-8 w-8 bg-transparent object-contain"
+          />
           <span className="text-[17px] font-semibold tracking-tight">LearnHub</span>
         </a>
         <SidebarNav path={path} />
@@ -118,7 +122,11 @@ const InstructorLayout = ({ children }) => {
           <aside className="relative flex h-full w-[240px] flex-col bg-neutral-950 text-white">
             <div className="flex items-center justify-between px-4 py-4">
               <a href="/giang-day/quan-tri" className="flex items-center gap-2">
-                <GraduationCap className="size-6" strokeWidth={1.75} />
+                <img
+                  src={logoLearnHub}
+                  alt="LearnHub"
+                  className="h-7 w-7 bg-transparent object-contain"
+                />
                 <span className="text-[16px] font-semibold">LearnHub</span>
               </a>
               <button

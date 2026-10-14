@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authGet, authPost, getAuthUser, setPendingToast } from "@/lib/auth";
 import { isInstructor, isAdmin } from "@/lib/roles";
+import { studioHint } from "@/lib/teachStart";
 import InstructorLayout from "@/instructor/layout";
 
 const STATUS = {
@@ -14,6 +15,7 @@ const STATUS = {
 const InstructorPage = () => {
   const [tab, setTab] = useState("courses");
   const [courses, setCourses] = useState([]);
+  const [onboarding, setOnboarding] = useState(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
@@ -33,6 +35,7 @@ const InstructorPage = () => {
     authGet("/api/instructor/studio")
       .then((data) => {
         setCourses(data.courses || []);
+        setOnboarding(data.onboarding || null);
       })
       .catch((err) => {
         if (String(err.message || "").includes("Phiên")) {
@@ -207,8 +210,7 @@ const InstructorPage = () => {
                     Tạo khóa học thu hút
                   </h2>
                   <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground">
-                    Từ câu trả lời của bạn, hãy chọn một kỹ năng cụ thể. Học viên tìm người giúp họ
-                    làm được việc — không phải giáo trình dài.
+                    {studioHint(onboarding)}
                   </p>
                 </div>
               </div>

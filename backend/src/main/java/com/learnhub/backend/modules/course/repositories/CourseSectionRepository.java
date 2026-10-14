@@ -1,5 +1,6 @@
 package com.learnhub.backend.modules.course.repositories;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +17,7 @@ public interface CourseSectionRepository extends JpaRepository<CourseSection, Lo
 
     @Query("select coalesce(max(s.sortOrder), -1) from CourseSection s where s.course.id = :courseId")
     int maxSortOrder(@Param("courseId") Long courseId);
+
+    @Query("select s.course.id, count(s) from CourseSection s where s.course.id in :ids group by s.course.id")
+    List<Object[]> countGroupedByCourseIds(@Param("ids") Collection<Long> ids);
 }

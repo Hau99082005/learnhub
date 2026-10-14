@@ -26,6 +26,16 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
     @Query("select coalesce(sum(l.durationSeconds), 0) from Lesson l where l.section.course.id = :courseId")
     int totalDuration(@Param("courseId") Long courseId);
 
+    @Query("select l.section.course.id, count(l) from Lesson l where l.section.course.id in :ids group by l.section.course.id")
+    List<Object[]> countGroupedByCourseIds(@Param("ids") Collection<Long> ids);
+
+    @Query("""
+            select l.section.course.id, count(l) from Lesson l
+            where l.section.course.id in :ids and l.media is not null
+            group by l.section.course.id
+            """)
+    List<Object[]> countWithMediaByCourseIds(@Param("ids") Collection<Long> ids);
+
     boolean existsBySlugAndSectionId(String slug, Long sectionId);
 
     boolean existsBySlugAndSectionIdAndIdNot(String slug, Long sectionId, Long id);

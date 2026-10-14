@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 import { addCourseToCart, isInCart, onCartChange } from "@/lib/cart";
-import { isOwned } from "@/lib/courseAccess";
+import { isOwned, onOwnedChange } from "@/lib/courseAccess";
+import { onAuthChange } from "@/lib/auth";
 
 let coursesPromise;
 
@@ -70,12 +71,22 @@ function formatCount(value) {
 function CourseCard({ item, wished, onWish }) {
   const [inCart, setInCart] = useState(() => isInCart(item.id));
   const [adding, setAdding] = useState(false);
-  const owned = isOwned(item.id);
+  const [owned, setOwned] = useState(() => isOwned(item.id));
 
   useEffect(() => {
-    const stop = onCartChange(() => setInCart(isInCart(item.id)));
-    setInCart(isInCart(item.id));
-    return stop;
+    const sync = () => {
+      setInCart(isInCart(item.id));
+      setOwned(isOwned(item.id));
+    };
+    const stopCart = onCartChange(sync);
+    const stopOwned = onOwnedChange(sync);
+    const stopAuth = onAuthChange(sync);
+    sync();
+    return () => {
+      stopCart();
+      stopOwned();
+      stopAuth();
+    };
   }, [item.id]);
   const rating = Number(item.ratingAvg) || 0;
   const ratingCount = Number(item.ratingCount) || 0;

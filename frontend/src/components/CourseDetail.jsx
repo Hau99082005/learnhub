@@ -26,13 +26,13 @@ import {
 } from "@/components/Course";
 import { cn } from "@/lib/utils";
 import {
-  addOwned,
   canAccessCourse,
   isInCart,
   isOwned,
+  onOwnedChange,
 } from "@/lib/courseAccess";
 import { addCourseToCart, loadCart, onCartChange } from "@/lib/cart";
-import { getAuthUser } from "@/lib/auth";
+import { getAuthUser, onAuthChange } from "@/lib/auth";
 import { markAccessed } from "@/lib/learning";
 
 const LANG = { vi: "Tiếng Việt", en: "English" };
@@ -370,15 +370,25 @@ function PurchaseCard({ item, onAccessChange }) {
     !isFree && Number.isFinite(compare) && compare > Number(item.price);
   const off = discountOf(item.price, item.compareAtPrice);
   const duration = formatDuration(item.durationSeconds);
-  const owned = isOwned(item.id);
+  const [owned, setOwned] = useState(() => isOwned(item.id));
   const [inCart, setInCart] = useState(() => isInCart(item.id));
   const [adding, setAdding] = useState(false);
   const [buying, setBuying] = useState(false);
 
   useEffect(() => {
-    const stop = onCartChange(() => setInCart(isInCart(item.id)));
-    setInCart(isInCart(item.id));
-    return stop;
+    const sync = () => {
+      setInCart(isInCart(item.id));
+      setOwned(isOwned(item.id));
+    };
+    const stopCart = onCartChange(sync);
+    const stopOwned = onOwnedChange(sync);
+    const stopAuth = onAuthChange(sync);
+    sync();
+    return () => {
+      stopCart();
+      stopOwned();
+      stopAuth();
+    };
   }, [item.id]);
 
   return (
@@ -501,7 +511,6 @@ function PurchaseCard({ item, onAccessChange }) {
                 if (!ok) {
                   return;
                 }
-                addOwned(item);
                 onAccessChange?.();
                 window.location.href = "/gio-hang";
               }}
@@ -608,9 +617,16 @@ function CourseDetailView({ slug }) {
   void accessKey;
 
   useEffect(() => {
-    const stop = onCartChange(() => setAccessKey((value) => value + 1));
-    loadCart().then(() => setAccessKey((value) => value + 1));
-    return stop;
+    const bump = () => setAccessKey((value) => value + 1);
+    const stopCart = onCartChange(bump);
+    const stopOwned = onOwnedChange(bump);
+    const stopAuth = onAuthChange(bump);
+    loadCart().then(bump);
+    return () => {
+      stopCart();
+      stopOwned();
+      stopAuth();
+    };
   }, []);
 
   useEffect(() => {

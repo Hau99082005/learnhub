@@ -7,27 +7,13 @@ import { confirmCheckout, createCheckout, getCheckout } from "@/lib/checkout";
 import { addOwnedMany } from "@/lib/courseAccess";
 import { getCart, loadCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
-import vnpayLogo from "@/assets/images/Icon-VNPAY-QR.webp";
-import momoLogo from "@/assets/images/MoMo_Logo_App.svg.webp";
 import bankLogo from "@/assets/images/png-clipart-bank-transfer-logo-wire-transfer-electronic-funds-transfer-bank-payment-computer-icons-bank-text-rectangle.png";
 
 const METHODS = [
   {
-    id: "VNPAY",
-    name: "VNPay",
-    hint: "ATM, QR, thẻ nội địa và quốc tế",
-    logo: vnpayLogo,
-  },
-  {
-    id: "MOMO",
-    name: "MoMo",
-    hint: "Thanh toán nhanh bằng ví MoMo",
-    logo: momoLogo,
-  },
-  {
     id: "BANK_TRANSFER",
     name: "Chuyển khoản ngân hàng",
-    hint: "Chuyển khoản đúng nội dung đơn hàng",
+    hint: "VietQR hoặc chuyển khoản nội địa, mở khóa học ngay sau khi thanh toán",
     logo: bankLogo,
   },
 ];
@@ -311,7 +297,7 @@ function PayGuide({ order }) {
           Đang xác nhận thanh toán
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          SePay đã nhận giao dịch. Hệ thống đang lưu đơn rồi chuyển vào học tập.
+          Giao dịch đã được ghi nhận. Hệ thống đang mở khóa học và chuyển bạn vào trang học tập.
         </p>
       </div>
     );
@@ -340,12 +326,12 @@ function PayGuide({ order }) {
     result === "cancel"
       ? "Bạn đã hủy thanh toán"
       : result === "error"
-        ? "Thanh toán chưa thành công"
-        : "Đang chuyển đến SePay";
+        ? "Thanh toán chưa hoàn tất"
+        : "Đang chuyển đến trang thanh toán";
   const hint =
     result === "cancel" || result === "error"
-      ? "Nhấn Thanh toán qua SePay để thử lại."
-      : `Cổng thanh toán SePay sẽ mở để bạn hoàn tất đơn ${order.orderCode}.`;
+      ? "Nhấn Tiếp tục thanh toán để thử lại."
+      : `Hoàn tất chuyển khoản cho đơn ${order.orderCode} để mở khóa học.`;
   return (
     <div className="border border-border px-4 py-8 text-center sm:px-6">
       <p className="text-base font-semibold" style={fieldStyle}>
@@ -359,7 +345,7 @@ function PayGuide({ order }) {
 function CheckoutStart() {
   const [cart, setCart] = useState(getCart);
   const [ready, setReady] = useState(false);
-  const [provider, setProvider] = useState("VNPAY");
+  const [provider, setProvider] = useState("BANK_TRANSFER");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -383,7 +369,7 @@ function CheckoutStart() {
       if (submitSePayGateway(order)) {
         return;
       }
-      toast.error("Không mở được cổng thanh toán SePay");
+      toast.error("Không khởi tạo được thanh toán. Vui lòng thử lại.");
       setSubmitting(false);
     } catch (error) {
       const message = error.message || "Không thể tạo đơn thanh toán";
@@ -467,7 +453,7 @@ function CheckoutStart() {
               letterSpacing: "0.01em",
             }}
           >
-            VNPay, MoMo hoặc chuyển khoản ngân hàng.
+            Thanh toán an toàn. Khóa học được mở ngay sau khi giao dịch thành công.
           </p>
           <div className="mt-4">
             <MethodPicker selected={provider} onSelect={setProvider} />
@@ -525,10 +511,10 @@ function CheckoutOrder({ orderCode }) {
     }
     if (result === "cancel") {
       noticeRef.current = true;
-      toast.message("Bạn đã hủy thanh toán SePay");
+      toast.message("Bạn đã hủy thanh toán");
     } else if (result === "error") {
       noticeRef.current = true;
-      toast.error("Thanh toán SePay chưa thành công");
+      toast.error("Thanh toán chưa hoàn tất");
     }
   }, []);
 
@@ -675,7 +661,7 @@ function CheckoutOrder({ orderCode }) {
                   className="inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 sm:w-auto sm:px-8"
                   style={{ border: "none", borderRadius: "5px" }}
                 >
-                  Thanh toán qua SePay
+                  Tiếp tục thanh toán
                 </button>
               ) : null}
               <button

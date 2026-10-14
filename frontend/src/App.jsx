@@ -22,7 +22,8 @@ import SettingsPage from "@/settings/page"
 import LearningPage from "@/learning/page"
 import CoursePlayerPage from "@/learn/page"
 import { Toaster } from "@/components/ui/sonner"
-import { consumePendingToast } from "@/lib/auth"
+import { consumePendingToast, onAuthChange } from "@/lib/auth"
+import { hydrateOwned } from "@/lib/courseAccess"
 
 const AdminPage = lazy(() => import("@/admin/page"))
 
@@ -49,6 +50,13 @@ function App() {
       return
     }
     toast.success(pending.message)
+  }, [])
+
+  useEffect(() => {
+    hydrateOwned()
+    return onAuthChange(() => {
+      hydrateOwned()
+    })
   }, [])
 
   if (isTeachStart) {

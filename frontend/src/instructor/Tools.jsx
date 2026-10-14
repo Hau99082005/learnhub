@@ -310,8 +310,8 @@ const Tools = () => {
       setBankForm(fillBank(data?.bank));
       toast.success(
         data?.bank?.sepayLinked
-          ? "Đã lưu tài khoản. Cổng SePay sẽ tạo mã theo giảng viên này."
-          : "Đã lưu STK. Hãy liên kết đúng số này trên SePay LearnHub để cổng thanh toán dùng tài khoản của bạn.",
+          ? "Đã lưu và kết nối SePay. Học viên trả về đúng STK này sẽ được xác nhận tự động."
+          : "Đã lưu STK. Thêm đúng số này trên SePay (my.sepay.vn) để hệ thống tự xác nhận.",
       );
     } catch (error) {
       toast.error(error.message);
@@ -546,7 +546,7 @@ const Tools = () => {
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <h2 className="text-[16px] font-semibold">Tài khoản nhận học phí</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Số này gắn với khóa học của bạn. Học viên thanh toán trên cổng SePay; đơn được xác nhận tự động khi giao dịch thành công.
+              SePay chỉ nhận tiền và tự xác nhận với số tài khoản đã kết nối trên SePay. Thêm đúng STK này tại my.sepay.vn (Tài khoản ngân hàng), rồi lưu lại trên LearnHub.
             </p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
@@ -614,8 +614,8 @@ const Tools = () => {
                 <p className="mt-1 font-mono text-sm tracking-wide">{bank.accountNumber}</p>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                   {bank.sepayLinked
-                    ? "Đã khớp với tài khoản trên SePay. Đơn học viên sẽ mang mã giảng viên và nhận về đúng STK này."
-                    : "STK chưa có trên SePay LearnHub. Cổng thanh toán vẫn tự xác nhận nhưng sẽ dùng tài khoản mặc định của nền tảng."}
+                    ? "Đã kết nối SePay. Học viên chuyển đúng STK này, đơn tự xác nhận."
+                    : "STK chưa kết nối SePay nên cổng thanh toán không nhận được giao dịch. Thêm số này trên my.sepay.vn rồi bấm Lưu tài khoản."}
                 </p>
               </>
             ) : (

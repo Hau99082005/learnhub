@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,6 +20,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import com.learnhub.backend.config.SePayProperties;
+import com.learnhub.backend.modules.instructor.support.VnBanks;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -49,6 +52,13 @@ public class SePayTransactionClient {
         return lastMessage;
     }
 
+    public void invalidateBankCache() {
+        synchronized (lock) {
+            bankCache = List.of();
+            bankCacheAt = 0;
+        }
+    }
+
     public Optional<LinkedAccount> findLinkedAccount(String accountNumber) {
         String expected = digits(accountNumber);
         if (expected.isEmpty()) {
@@ -58,6 +68,94 @@ public class SePayTransactionClient {
             if (expected.equals(digits(row.accountNumber()))) {
                 return Optional.of(row);
             }
+        }
+        return Optional.empty();
+    }
+
+    public Optional<LinkedAccount> ensureLinkedAccount(String bankCode, String accountNumber, String accountName, String label) {
+        Optional<LinkedAccount> existing = findLinkedAccount(accountNumber);
+        if (existing.isPresent()) {
+            return existing;
+        }
+        String token = sePayProperties.getApiToken() == null ? "" : sePayProperties.getApiToken().trim();
+        String number = digits(accountNumber);
+        if (token.isBlank() || number.isEmpty()) {
+            return Optional.empty();
+        }
+        String shortName = VnBanks.sepayShortName(bankCode);
+        String holder = accountName == null ? "" : accountName.trim();
+        String tag = label == null || label.isBlank() ? "LearnHub GV " + number : label.trim();
+        Map<String, String> payload = new LinkedHashMap<>();
+        payload.put("account_number", number);
+        payload.put("account_holder_name", holder);
+        payload.put("bank_short_name", shortName);
+        payload.put("bank_code", shortName);
+        payload.put("account_type", "personal");
+        payload.put("label", tag);
+        String json = objectMapper.writeValueAsString(payload);
+        String v2 = sePayProperties.getApiBaseUrl();
+        if (v2 == null || v2.isBlank()) {
+            v2 = "https://userapi.sepay.vn/v2";
+        }
+        String root = v2.replaceAll("/$", "");
+        List<String> urls = List.of(
+                root + "/bank-accounts",
+                "https://my.sepay.vn/userapi/bankaccounts",
+                "https://my.sepay.vn/userapi/bankaccounts/add");
+        for (String url : urls) {
+            try {
+                String body = restClient.post()
+                        .uri(url)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Accept", "application/json")
+                        .header("Content-Type", "application/json")
+                        .body(json)
+                        .retrieve()
+                        .body(String.class);
+                Optional<LinkedAccount> created = parseCreatedAccount(body == null ? "{}" : body, number);
+                if (created.isPresent()) {
+                    synchronized (lock) {
+                        bankCache = List.of();
+                        bankCacheAt = 0;
+                    }
+                    return created;
+                }
+            } catch (RestClientResponseException exception) {
+                log.warn("SePay create bank HTTP {} {}", exception.getStatusCode().value(), url);
+            } catch (RuntimeException exception) {
+                log.warn("SePay create bank error {}", url);
+            }
+        }
+        synchronized (lock) {
+            bankCache = List.of();
+            bankCacheAt = 0;
+        }
+        return findLinkedAccount(number);
+    }
+
+    private Optional<LinkedAccount> parseCreatedAccount(String body, String accountNumber) {
+        JsonNode root = objectMapper.readTree(body);
+        JsonNode data = root.path("data");
+        if (data.isObject() && !data.isEmpty()) {
+            String id = firstText(data, "id", "xid");
+            String number = firstText(data, "account_number", "accountNumber");
+            if (id.isBlank()) {
+                id = firstText(root, "id", "xid");
+            }
+            if (number.isBlank()) {
+                number = accountNumber;
+            }
+            if (!id.isBlank()) {
+                return Optional.of(new LinkedAccount(
+                        id,
+                        number,
+                        firstText(data, "account_holder_name", "accountHolderName"),
+                        firstText(data, "bank_code", "bankCode", "bank_short_name", "bankShortName")));
+            }
+        }
+        String id = firstText(root, "id", "xid");
+        if (!id.isBlank()) {
+            return Optional.of(new LinkedAccount(id, accountNumber, "", ""));
         }
         return Optional.empty();
     }
@@ -78,29 +176,34 @@ public class SePayTransactionClient {
             v2 = "https://userapi.sepay.vn/v2";
         }
         String root = v2.replaceAll("/$", "");
-        try {
-            String body = restClient.get()
-                    .uri(root + "/bank-accounts?active=1&per_page=100")
-                    .header("Authorization", "Bearer " + token)
-                    .header("Accept", "application/json")
-                    .retrieve()
-                    .body(String.class);
-            List<LinkedAccount> rows = parseLinkedAccounts(body == null ? "{}" : body);
-            synchronized (lock) {
-                bankCache = rows;
-                bankCacheAt = System.currentTimeMillis();
+        List<String> urls = List.of(
+                root + "/bank-accounts?per_page=100",
+                root + "/bank-accounts?active=1&per_page=100",
+                "https://my.sepay.vn/userapi/bankaccounts/list");
+        for (String url : urls) {
+            try {
+                String body = restClient.get()
+                        .uri(url)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Accept", "application/json")
+                        .retrieve()
+                        .body(String.class);
+                List<LinkedAccount> rows = parseLinkedAccounts(body == null ? "{}" : body);
+                if (!rows.isEmpty()) {
+                    synchronized (lock) {
+                        bankCache = rows;
+                        bankCacheAt = System.currentTimeMillis();
+                    }
+                    return rows;
+                }
+            } catch (RestClientResponseException exception) {
+                log.warn("SePay bank-accounts HTTP {} {}", exception.getStatusCode().value(), url);
+            } catch (RuntimeException exception) {
+                log.warn("SePay bank-accounts error {}", url);
             }
-            return rows;
-        } catch (RestClientResponseException exception) {
-            log.warn("SePay bank-accounts HTTP {}", exception.getStatusCode().value());
-            synchronized (lock) {
-                return bankCache;
-            }
-        } catch (RuntimeException exception) {
-            log.warn("SePay bank-accounts error", exception);
-            synchronized (lock) {
-                return bankCache;
-            }
+        }
+        synchronized (lock) {
+            return bankCache;
         }
     }
 
@@ -108,6 +211,9 @@ public class SePayTransactionClient {
         JsonNode root = objectMapper.readTree(body);
         List<LinkedAccount> rows = new ArrayList<>();
         JsonNode data = root.path("data");
+        if (!data.isArray()) {
+            data = root.path("bankaccounts");
+        }
         if (!data.isArray()) {
             return rows;
         }
@@ -175,7 +281,7 @@ public class SePayTransactionClient {
                 lastMessage = "SePay đang giới hạn request, dùng dữ liệu vừa lấy";
                 return cache;
             }
-            if (now - cacheAt < 25000 && !cache.isEmpty()) {
+            if (now - cacheAt < 5000 && !cache.isEmpty()) {
                 return cache;
             }
         }

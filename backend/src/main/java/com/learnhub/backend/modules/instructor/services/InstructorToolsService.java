@@ -222,7 +222,9 @@ public class InstructorToolsService {
         row.setBankName(VnBanks.nameOf(code));
         row.setAccountNumber(number);
         row.setAccountName(name.toUpperCase(Locale.ROOT));
-        row.setSepayAccountId(sePayTransactions.findLinkedAccount(number)
+        sePayTransactions.invalidateBankCache();
+        row.setSepayAccountId(sePayTransactions
+                .ensureLinkedAccount(code, number, name.toUpperCase(Locale.ROOT), "GV" + account.getId())
                 .map(SePayTransactionClient.LinkedAccount::id)
                 .orElse(null));
         banks.saveAndFlush(row);
@@ -261,6 +263,12 @@ public class InstructorToolsService {
         boolean linked = row.getSepayAccountId() != null && !row.getSepayAccountId().isBlank();
         if (!linked) {
             linked = sePayTransactions.findLinkedAccount(row.getAccountNumber()).isPresent();
+            if (linked && (row.getSepayAccountId() == null || row.getSepayAccountId().isBlank())) {
+                sePayTransactions.findLinkedAccount(row.getAccountNumber()).ifPresent((item) -> {
+                    row.setSepayAccountId(item.id());
+                    banks.save(row);
+                });
+            }
         }
         return new InstructorBankDTO(
                 row.getId(),

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShoppingBag, Tag } from "lucide-react";
+import { Check, Copy, Loader2, ShoppingBag, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { formatMoney } from "@/components/Course";
 import { Input } from "@/components/ui/input";
 import { getAuthUser } from "@/lib/auth";
-import { confirmCheckout, createCheckout, getCheckout } from "@/lib/checkout";
+import { confirmCheckout, createCheckout } from "@/lib/checkout";
 import { addOwnedMany } from "@/lib/courseAccess";
 import { getCart, loadCart } from "@/lib/cart";
 import { previewCoupon } from "@/lib/coupon";
@@ -303,6 +303,17 @@ function MethodPicker({ selected, onSelect }) {
   );
 }
 
+function copyValue(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return;
+  }
+  navigator.clipboard
+    .writeText(text)
+    .then(() => toast.success("Đã sao chép"))
+    .catch(() => toast.error("Không sao chép được"));
+}
+
 function PayGuide({ order }) {
   if (paymentQuery() === "success" && !isPaid(order)) {
     return (
@@ -335,7 +346,74 @@ function PayGuide({ order }) {
       </div>
     );
   }
+  const bank = order.bankTransfer;
+  const hasInstructorQr = Boolean(bank?.accountNumber && bank?.qrUrl) && !order.gateway?.action;
   const result = paymentQuery();
+  if (hasInstructorQr) {
+    return (
+      <div className="border border-border px-4 py-5 sm:px-6">
+        <p className="text-center text-base font-semibold" style={fieldStyle}>
+          Quét QR để thanh toán
+        </p>
+        <p className="mt-1 text-center text-sm text-muted-foreground">
+          Chuyển khoản đúng tài khoản giảng viên. Hệ thống tự xác nhận ngay sau khi giao dịch thành công.
+        </p>
+        <div className="mt-5 flex justify-center">
+          <img
+            src={bank.qrUrl}
+            alt="Mã QR thanh toán"
+            className="size-52 rounded-lg border border-border bg-white object-contain p-2 sm:size-60"
+          />
+        </div>
+        <div className="mt-5 space-y-3 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-muted-foreground">Ngân hàng</p>
+              <p className="font-medium">{bank.bankName || bank.bankCode}</p>
+            </div>
+          </div>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-muted-foreground">Chủ tài khoản</p>
+              <p className="font-medium">{bank.accountName}</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-muted-foreground">Số tài khoản</p>
+              <p className="font-mono text-base font-semibold tracking-wide">{bank.accountNumber}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyValue(bank.accountNumber)}
+              className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
+              aria-label="Sao chép số tài khoản"
+            >
+              <Copy className="size-4" />
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-muted-foreground">Nội dung chuyển khoản</p>
+              <p className="font-mono font-semibold">{bank.transferContent || order.orderCode}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyValue(bank.transferContent || order.orderCode)}
+              className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
+              aria-label="Sao chép nội dung"
+            >
+              <Copy className="size-4" />
+            </button>
+          </div>
+        </div>
+        <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Đang chờ chuyển khoản, không cần bấm xác nhận
+        </div>
+      </div>
+    );
+  }
   const title =
     result === "cancel"
       ? "Bạn đã hủy thanh toán"
@@ -601,7 +679,6 @@ function CheckoutStart() {
 function CheckoutOrder({ orderCode }) {
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
-  const [confirming, setConfirming] = useState(false);
   const paidRef = useRef(false);
   const noticeRef = useRef(false);
   const openedRef = useRef(false);
@@ -645,9 +722,7 @@ function CheckoutOrder({ orderCode }) {
     const returning = paymentQuery() === "success";
     const tick = async () => {
       try {
-        const next = returning
-          ? await confirmCheckout(orderCode)
-          : await getCheckout(orderCode);
+        const next = await confirmCheckout(orderCode);
         if (stopped) {
           return;
         }
@@ -682,34 +757,6 @@ function CheckoutOrder({ orderCode }) {
       window.clearInterval(timer);
     };
   }, [orderCode]);
-
-  const confirm = async () => {
-    setConfirming(true);
-    try {
-      const next = await confirmCheckout(orderCode);
-      setOrder(next);
-      if (!isPaid(next)) {
-        toast.message("Chưa khớp được giao dịch, hệ thống đang đối chiếu lại");
-        return;
-      }
-      paidRef.current = true;
-      addOwnedMany((next.items || []).map((item) => item.courseId));
-      await loadCart();
-      toast.success("Thanh toán thành công");
-      window.setTimeout(() => {
-        window.location.replace("/hoc-tap");
-      }, 900);
-    } catch (err) {
-      const message = err.message || "Không thể xác nhận thanh toán";
-      if (String(message).toLowerCase().includes("conflict") || String(message).includes("SePay")) {
-        toast.message("Chưa khớp được giao dịch, hệ thống đang đối chiếu lại");
-        return;
-      }
-      toast.error(message);
-    } finally {
-      setConfirming(false);
-    }
-  };
 
   if (error) {
     return (
@@ -756,30 +803,15 @@ function CheckoutOrder({ orderCode }) {
       >
         <div className="space-y-4">
           <PayGuide order={order} />
-          {!paid && !returning ? (
+          {!paid && !returning && order.gateway?.action ? (
             <div className="flex flex-col gap-3 sm:flex-row">
-              {order.gateway?.action ? (
-                <button
-                  type="button"
-                  onClick={() => submitSePayGateway(order)}
-                  className="inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 sm:w-auto sm:px-8"
-                  style={{ border: "none", borderRadius: "5px" }}
-                >
-                  Tiếp tục thanh toán
-                </button>
-              ) : null}
               <button
                 type="button"
-                disabled={confirming}
-                onClick={confirm}
-                className="inline-flex h-11 w-full items-center justify-center border border-border bg-background text-sm font-medium transition hover:bg-muted disabled:opacity-70 sm:w-auto sm:px-8"
-                style={{ borderRadius: "5px" }}
+                onClick={() => submitSePayGateway(order)}
+                className="inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 sm:w-auto sm:px-8"
+                style={{ border: "none", borderRadius: "5px" }}
               >
-                {confirming
-                  ? "Đang kiểm tra..."
-                  : order.provider === "BANK_TRANSFER"
-                    ? "Kiểm tra thanh toán"
-                    : "Tôi đã thanh toán"}
+                Tiếp tục thanh toán
               </button>
             </div>
           ) : null}

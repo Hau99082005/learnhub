@@ -5,6 +5,7 @@ import java.util.Map;
 
 public final class VnBanks {
     private static final Map<String, String> BANKS = new LinkedHashMap<>();
+    private static final Map<String, String> SEPAY = new LinkedHashMap<>();
 
     static {
         BANKS.put("MBBank", "MB Bank");
@@ -45,6 +46,44 @@ public final class VnBanks {
         BANKS.put("CIMB", "CIMB");
         BANKS.put("HSBC", "HSBC");
         BANKS.put("PublicBank", "Public Bank");
+        SEPAY.put("MBBank", "MB");
+        SEPAY.put("Vietcombank", "VCB");
+        SEPAY.put("VietinBank", "ICB");
+        SEPAY.put("BIDV", "BIDV");
+        SEPAY.put("Agribank", "VBA");
+        SEPAY.put("Techcombank", "TCB");
+        SEPAY.put("ACB", "ACB");
+        SEPAY.put("VPBank", "VPB");
+        SEPAY.put("TPBank", "TPB");
+        SEPAY.put("Sacombank", "STB");
+        SEPAY.put("HDBank", "HDB");
+        SEPAY.put("VIB", "VIB");
+        SEPAY.put("SHB", "SHB");
+        SEPAY.put("MSB", "MSB");
+        SEPAY.put("OCB", "OCB");
+        SEPAY.put("SeABank", "SEAB");
+        SEPAY.put("Eximbank", "EIB");
+        SEPAY.put("LPBank", "LPB");
+        SEPAY.put("NamABank", "NAB");
+        SEPAY.put("VietABank", "VAB");
+        SEPAY.put("BacABank", "BAB");
+        SEPAY.put("PVcomBank", "PVCB");
+        SEPAY.put("NCB", "NCB");
+        SEPAY.put("BaoVietBank", "BVB");
+        SEPAY.put("ABBank", "ABB");
+        SEPAY.put("VietBank", "VIETBANK");
+        SEPAY.put("KienLongBank", "KLB");
+        SEPAY.put("PGBank", "PGB");
+        SEPAY.put("SaigonBank", "SGICB");
+        SEPAY.put("BVBank", "BVBANK");
+        SEPAY.put("Cake", "CAKE");
+        SEPAY.put("Timo", "TIMO");
+        SEPAY.put("Ubank", "UBANK");
+        SEPAY.put("ShinhanBank", "SVB");
+        SEPAY.put("Woori", "WVN");
+        SEPAY.put("CIMB", "CIMB");
+        SEPAY.put("HSBC", "HSBC");
+        SEPAY.put("PublicBank", "PBVN");
     }
 
     private VnBanks() {
@@ -63,5 +102,12 @@ public final class VnBanks {
             return "";
         }
         return BANKS.getOrDefault(code, code);
+    }
+
+    public static String sepayShortName(String code) {
+        if (code == null || code.isBlank()) {
+            return "";
+        }
+        return SEPAY.getOrDefault(code.trim(), code.trim());
     }
 }

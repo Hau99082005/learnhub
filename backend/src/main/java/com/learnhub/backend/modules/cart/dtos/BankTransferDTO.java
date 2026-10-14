@@ -1,6 +1,7 @@
 package com.learnhub.backend.modules.cart.dtos;
 
 public class BankTransferDTO {
+    private final String bankCode;
     private final String bankName;
     private final String accountName;
     private final String accountNumber;
@@ -13,7 +14,7 @@ public class BankTransferDTO {
             String accountName,
             String accountNumber,
             String transferContent) {
-        this(bankName, accountName, accountNumber, transferContent, "", "");
+        this(bankName, bankName, accountName, accountNumber, transferContent, "", "");
     }
 
     public BankTransferDTO(
@@ -22,7 +23,7 @@ public class BankTransferDTO {
             String accountNumber,
             String transferContent,
             String qrUrl) {
-        this(bankName, accountName, accountNumber, transferContent, qrUrl, "");
+        this(bankName, bankName, accountName, accountNumber, transferContent, qrUrl, "");
     }
 
     public BankTransferDTO(
@@ -32,12 +33,28 @@ public class BankTransferDTO {
             String transferContent,
             String qrUrl,
             String syncMessage) {
+        this(bankName, bankName, accountName, accountNumber, transferContent, qrUrl, syncMessage);
+    }
+
+    public BankTransferDTO(
+            String bankCode,
+            String bankName,
+            String accountName,
+            String accountNumber,
+            String transferContent,
+            String qrUrl,
+            String syncMessage) {
+        this.bankCode = bankCode;
         this.bankName = bankName;
         this.accountName = accountName;
         this.accountNumber = accountNumber;
         this.transferContent = transferContent;
         this.qrUrl = qrUrl;
         this.syncMessage = syncMessage;
+    }
+
+    public String getBankCode() {
+        return bankCode;
     }
 
     public String getBankName() {

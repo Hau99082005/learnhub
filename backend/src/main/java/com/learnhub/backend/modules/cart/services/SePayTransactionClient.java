@@ -25,7 +25,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class SePayTransactionClient {
     private static final Logger log = LoggerFactory.getLogger(SePayTransactionClient.class);
-    private static final Pattern ORDER_TOKEN = Pattern.compile("LH[0-9A-Z]{6,}", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ORDER_TOKEN = Pattern.compile("(?:GV\\d+|LH)[0-9A-Z]{4,}", Pattern.CASE_INSENSITIVE);
 
     private final SePayProperties sePayProperties;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -34,6 +34,8 @@ public class SePayTransactionClient {
     private List<Hit> cache = List.of();
     private long cacheAt = 0;
     private long blockedUntil = 0;
+    private List<LinkedAccount> bankCache = List.of();
+    private long bankCacheAt = 0;
     private volatile String lastMessage = "Chưa gọi SePay";
 
     public SePayTransactionClient(SePayProperties sePayProperties) {
@@ -47,17 +49,118 @@ public class SePayTransactionClient {
         return lastMessage;
     }
 
+    public Optional<LinkedAccount> findLinkedAccount(String accountNumber) {
+        String expected = digits(accountNumber);
+        if (expected.isEmpty()) {
+            return Optional.empty();
+        }
+        for (LinkedAccount row : listLinkedAccounts()) {
+            if (expected.equals(digits(row.accountNumber()))) {
+                return Optional.of(row);
+            }
+        }
+        return Optional.empty();
+    }
+
+    public List<LinkedAccount> listLinkedAccounts() {
+        String token = sePayProperties.getApiToken() == null ? "" : sePayProperties.getApiToken().trim();
+        if (token.isBlank()) {
+            return List.of();
+        }
+        long now = System.currentTimeMillis();
+        synchronized (lock) {
+            if (now - bankCacheAt < 60_000 && !bankCache.isEmpty()) {
+                return bankCache;
+            }
+        }
+        String v2 = sePayProperties.getApiBaseUrl();
+        if (v2 == null || v2.isBlank()) {
+            v2 = "https://userapi.sepay.vn/v2";
+        }
+        String root = v2.replaceAll("/$", "");
+        try {
+            String body = restClient.get()
+                    .uri(root + "/bank-accounts?active=1&per_page=100")
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/json")
+                    .retrieve()
+                    .body(String.class);
+            List<LinkedAccount> rows = parseLinkedAccounts(body == null ? "{}" : body);
+            synchronized (lock) {
+                bankCache = rows;
+                bankCacheAt = System.currentTimeMillis();
+            }
+            return rows;
+        } catch (RestClientResponseException exception) {
+            log.warn("SePay bank-accounts HTTP {}", exception.getStatusCode().value());
+            synchronized (lock) {
+                return bankCache;
+            }
+        } catch (RuntimeException exception) {
+            log.warn("SePay bank-accounts error", exception);
+            synchronized (lock) {
+                return bankCache;
+            }
+        }
+    }
+
+    private List<LinkedAccount> parseLinkedAccounts(String body) {
+        JsonNode root = objectMapper.readTree(body);
+        List<LinkedAccount> rows = new ArrayList<>();
+        JsonNode data = root.path("data");
+        if (!data.isArray()) {
+            return rows;
+        }
+        for (JsonNode row : data) {
+            if (row == null || !row.isObject()) {
+                continue;
+            }
+            String id = firstText(row, "id", "xid");
+            String number = firstText(row, "account_number", "accountNumber");
+            if (id.isBlank() || number.isBlank()) {
+                continue;
+            }
+            String active = firstText(row, "active");
+            if ("0".equals(active) || "false".equalsIgnoreCase(active)) {
+                continue;
+            }
+            rows.add(new LinkedAccount(
+                    id,
+                    number,
+                    firstText(row, "account_holder_name", "accountHolderName"),
+                    firstText(row, "bank_code", "bankCode", "bank_short_name", "bankShortName")));
+        }
+        return rows;
+    }
+
     public Optional<Hit> findPaid(String orderCode, BigDecimal amount) {
+        return findPaid(orderCode, amount, null);
+    }
+
+    public Optional<Hit> findPaid(String orderCode, BigDecimal amount, String accountNumber) {
         BigDecimal due = amount == null ? BigDecimal.ZERO : amount.setScale(0, RoundingMode.DOWN);
+        String expected = digits(accountNumber);
         for (Hit hit : listRecentInbound()) {
             if (hit.scaled().compareTo(due) < 0) {
                 continue;
             }
-            if (matchesOrder(hit.content(), orderCode)) {
-                return Optional.of(hit);
+            if (!matchesOrder(hit.content(), orderCode)) {
+                continue;
             }
+            String got = digits(hit.accountNumber());
+            if (!expected.isEmpty() && !got.isEmpty() && !expected.equals(got)) {
+                continue;
+            }
+            return Optional.of(hit);
         }
         return Optional.empty();
+    }
+
+    private String digits(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("\\D+", "");
     }
 
     public List<Hit> listRecentInbound() {
@@ -230,6 +333,9 @@ public class SePayTransactionClient {
             }
         }
         return BigDecimal.ZERO;
+    }
+
+    public record LinkedAccount(String id, String accountNumber, String holderName, String bankCode) {
     }
 
     public record Hit(String id, BigDecimal amountIn, String content, String accountNumber) {

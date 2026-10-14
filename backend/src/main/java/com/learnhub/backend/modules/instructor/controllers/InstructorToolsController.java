@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.learnhub.backend.modules.instructor.dtos.ApplyTemplateRequest;
 import com.learnhub.backend.modules.instructor.dtos.CopyTemplateRequest;
+import com.learnhub.backend.modules.instructor.dtos.InstructorBankRequest;
 import com.learnhub.backend.modules.instructor.dtos.InstructorToolsDTO;
 import com.learnhub.backend.modules.instructor.dtos.PublishRequest;
 import com.learnhub.backend.modules.instructor.dtos.ToolCheckRequest;
@@ -83,5 +84,18 @@ public class InstructorToolsController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody PublishRequest request) {
         return ResponseEntity.ok(tools.unpublish(authorization, request));
+    }
+
+    @PostMapping("/bank")
+    public ResponseEntity<InstructorToolsDTO> saveBank(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody InstructorBankRequest request) {
+        return ResponseEntity.ok(tools.saveBank(authorization, request));
+    }
+
+    @DeleteMapping("/bank")
+    public ResponseEntity<InstructorToolsDTO> deleteBank(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(tools.deleteBank(authorization));
     }
 }

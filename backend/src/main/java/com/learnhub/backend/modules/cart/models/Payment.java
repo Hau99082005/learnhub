@@ -44,6 +44,15 @@ public class Payment {
     @Column(name = "checkout_url", length = 1000)
     private String checkoutUrl;
 
+    @Column(name = "payee_bank", length = 64)
+    private String payeeBank;
+
+    @Column(name = "payee_account_number", length = 32)
+    private String payeeAccountNumber;
+
+    @Column(name = "payee_account_name", length = 128)
+    private String payeeAccountName;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
@@ -136,6 +145,30 @@ public class Payment {
 
     public void setCheckoutUrl(String checkoutUrl) {
         this.checkoutUrl = checkoutUrl;
+    }
+
+    public String getPayeeBank() {
+        return payeeBank;
+    }
+
+    public void setPayeeBank(String payeeBank) {
+        this.payeeBank = payeeBank;
+    }
+
+    public String getPayeeAccountNumber() {
+        return payeeAccountNumber;
+    }
+
+    public void setPayeeAccountNumber(String payeeAccountNumber) {
+        this.payeeAccountNumber = payeeAccountNumber;
+    }
+
+    public String getPayeeAccountName() {
+        return payeeAccountName;
+    }
+
+    public void setPayeeAccountName(String payeeAccountName) {
+        this.payeeAccountName = payeeAccountName;
     }
 
     public LocalDateTime getPaidAt() {

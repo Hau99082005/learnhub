@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Circle,
   FileText,
+  Landmark,
   Plus,
   Rocket,
   Trash2,
@@ -20,6 +21,48 @@ const TABS = [
   { id: "publish", label: "Xuất bản", icon: Rocket },
   { id: "record", label: "Ghi hình", icon: Video },
   { id: "copy", label: "Mẫu mô tả", icon: FileText },
+  { id: "bank", label: "Tài khoản", icon: Landmark },
+];
+
+const BANKS = [
+  { id: "MBBank", label: "MB Bank" },
+  { id: "Vietcombank", label: "Vietcombank" },
+  { id: "VietinBank", label: "VietinBank" },
+  { id: "BIDV", label: "BIDV" },
+  { id: "Agribank", label: "Agribank" },
+  { id: "Techcombank", label: "Techcombank" },
+  { id: "ACB", label: "ACB" },
+  { id: "VPBank", label: "VPBank" },
+  { id: "TPBank", label: "TPBank" },
+  { id: "Sacombank", label: "Sacombank" },
+  { id: "HDBank", label: "HDBank" },
+  { id: "VIB", label: "VIB" },
+  { id: "SHB", label: "SHB" },
+  { id: "MSB", label: "MSB" },
+  { id: "OCB", label: "OCB" },
+  { id: "SeABank", label: "SeABank" },
+  { id: "Eximbank", label: "Eximbank" },
+  { id: "LPBank", label: "LPBank" },
+  { id: "NamABank", label: "Nam A Bank" },
+  { id: "VietABank", label: "VietABank" },
+  { id: "BacABank", label: "Bac A Bank" },
+  { id: "PVcomBank", label: "PVcomBank" },
+  { id: "NCB", label: "NCB" },
+  { id: "BaoVietBank", label: "BaoViet Bank" },
+  { id: "ABBank", label: "ABBank" },
+  { id: "VietBank", label: "VietBank" },
+  { id: "KienLongBank", label: "KienlongBank" },
+  { id: "PGBank", label: "PGBank" },
+  { id: "SaigonBank", label: "SaigonBank" },
+  { id: "BVBank", label: "BVBank" },
+  { id: "Cake", label: "CAKE" },
+  { id: "Timo", label: "Timo" },
+  { id: "Ubank", label: "Ubank" },
+  { id: "ShinhanBank", label: "Shinhan Bank" },
+  { id: "Woori", label: "Woori Bank" },
+  { id: "CIMB", label: "CIMB" },
+  { id: "HSBC", label: "HSBC" },
+  { id: "PublicBank", label: "Public Bank" },
 ];
 
 const KINDS = [
@@ -42,10 +85,19 @@ function kindLabel(kind) {
   return KINDS.find((item) => item.id === kind)?.label || kind;
 }
 
-function applySnapshot(data, setRecording, setTemplates, setCourses) {
+function applySnapshot(data, setRecording, setTemplates, setCourses, setBank) {
   setRecording(Array.isArray(data?.recording) ? data.recording : []);
   setTemplates(Array.isArray(data?.templates) ? data.templates : []);
   setCourses(Array.isArray(data?.courses) ? data.courses : []);
+  setBank(data?.bank || null);
+}
+
+function fillBank(row) {
+  return {
+    bankCode: row?.bankCode || "MBBank",
+    accountNumber: row?.accountNumber || "",
+    accountName: row?.accountName || "",
+  };
 }
 
 const Tools = () => {
@@ -53,11 +105,13 @@ const Tools = () => {
   const [recording, setRecording] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [bank, setBank] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [courseId, setCourseId] = useState("");
   const [form, setForm] = useState({ kind: "DESCRIPTION", title: "", body: "" });
+  const [bankForm, setBankForm] = useState(fillBank(null));
 
   const selected = useMemo(
     () => templates.find((item) => item.id === selectedId) || null,
@@ -73,7 +127,8 @@ const Tools = () => {
         if (cancelled) {
           return;
         }
-        applySnapshot(data, setRecording, setTemplates, setCourses);
+        applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
+        setBankForm(fillBank(data?.bank));
         const copies = Array.isArray(data?.templates) ? data.templates : [];
         const list = Array.isArray(data?.courses) ? data.courses : [];
         if (copies[0]?.id) {
@@ -121,7 +176,7 @@ const Tools = () => {
         key: item.key,
         checked: !item.checked,
       });
-      applySnapshot(data, setRecording, setTemplates, setCourses);
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -154,7 +209,7 @@ const Tools = () => {
       const data = selectedId
         ? await authPut(`/api/instructor/tools/templates/${selectedId}`, payload)
         : await authPost("/api/instructor/tools/templates", payload);
-      applySnapshot(data, setRecording, setTemplates, setCourses);
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
       const copies = Array.isArray(data?.templates) ? data.templates : [];
       if (!selectedId && copies[0]?.id) {
         setSelectedId(copies[0].id);
@@ -174,7 +229,7 @@ const Tools = () => {
     setBusy("delete");
     try {
       const data = await authDelete(`/api/instructor/tools/templates/${selectedId}`);
-      applySnapshot(data, setRecording, setTemplates, setCourses);
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
       const copies = Array.isArray(data?.templates) ? data.templates : [];
       if (copies[0]?.id) {
         setSelectedId(copies[0].id);
@@ -208,7 +263,7 @@ const Tools = () => {
       const data = await authPost(`/api/instructor/tools/templates/${selectedId}/apply`, {
         courseId: Number(courseId),
       });
-      applySnapshot(data, setRecording, setTemplates, setCourses);
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
       toast.success(`Đã áp dụng ${kindLabel(form.kind).toLowerCase()} vào khóa học`);
     } catch (error) {
       toast.error(error.message);
@@ -221,7 +276,7 @@ const Tools = () => {
     setBusy(`pub-${course.id}`);
     try {
       const data = await authPost("/api/instructor/tools/publish", { courseId: course.id });
-      applySnapshot(data, setRecording, setTemplates, setCourses);
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
       toast.success(`Đã xuất bản “${course.title}”`);
     } catch (error) {
       toast.error(error.message);
@@ -234,8 +289,44 @@ const Tools = () => {
     setBusy(`pub-${course.id}`);
     try {
       const data = await authPost("/api/instructor/tools/unpublish", { courseId: course.id });
-      applySnapshot(data, setRecording, setTemplates, setCourses);
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
       toast.success(`Đã chuyển “${course.title}” về nháp`);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const saveBank = async () => {
+    setBusy("bank");
+    try {
+      const data = await authPost("/api/instructor/tools/bank", {
+        bankCode: bankForm.bankCode,
+        accountNumber: bankForm.accountNumber,
+        accountName: bankForm.accountName,
+      });
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
+      setBankForm(fillBank(data?.bank));
+      toast.success(
+        data?.bank?.sepayLinked
+          ? "Đã lưu tài khoản. Cổng SePay sẽ tạo mã theo giảng viên này."
+          : "Đã lưu STK. Hãy liên kết đúng số này trên SePay LearnHub để cổng thanh toán dùng tài khoản của bạn.",
+      );
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const removeBank = async () => {
+    setBusy("bank-del");
+    try {
+      const data = await authDelete("/api/instructor/tools/bank");
+      applySnapshot(data, setRecording, setTemplates, setCourses, setBank);
+      setBankForm(fillBank(null));
+      toast.success("Đã xóa tài khoản nhận tiền");
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -247,7 +338,7 @@ const Tools = () => {
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Công cụ</h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
-        Checklist ghi hình, mẫu mô tả và công cụ xuất bản. Tiến độ được lưu theo tài khoản giảng viên.
+        Checklist ghi hình, mẫu mô tả, xuất bản và tài khoản nhận tiền. Học viên thanh toán trên cổng SePay, hệ thống tự xác nhận đơn.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -375,7 +466,13 @@ const Tools = () => {
                         Xuất bản
                       </Button>
                     )}
-                    <Button type="button" variant="outline" asChild={false} onClick={() => (window.location.href = `/giang-day/quan-tri/${course.id}/phan-hoc`)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        window.location.href = `/giang-day/quan-tri/${course.id}/phan-hoc`;
+                      }}
+                    >
                       Chương trình học
                     </Button>
                   </div>
@@ -441,6 +538,92 @@ const Tools = () => {
           >
             Mở studio ghi hình
           </a>
+        </section>
+      ) : null}
+
+      {!loading && tab === "bank" ? (
+        <section className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <h2 className="text-[16px] font-semibold">Tài khoản nhận học phí</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Số này gắn với khóa học của bạn. Học viên thanh toán trên cổng SePay; đơn được xác nhận tự động khi giao dịch thành công.
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="bank-code">Ngân hàng</Label>
+                <select
+                  id="bank-code"
+                  className={SELECT_CLASS}
+                  value={bankForm.bankCode}
+                  onChange={(event) => setBankForm((prev) => ({ ...prev, bankCode: event.target.value }))}
+                >
+                  {BANKS.map((item) => (
+                    <option key={item.id} value={item.id} className={OPTION_CLASS}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bank-number">Số tài khoản</Label>
+                <Input
+                  id="bank-number"
+                  inputMode="numeric"
+                  value={bankForm.accountNumber}
+                  onChange={(event) =>
+                    setBankForm((prev) => ({
+                      ...prev,
+                      accountNumber: event.target.value.replace(/[^\d\s]/g, ""),
+                    }))
+                  }
+                  placeholder="Số tài khoản nhận tiền"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bank-name">Tên chủ tài khoản</Label>
+                <Input
+                  id="bank-name"
+                  value={bankForm.accountName}
+                  onChange={(event) => setBankForm((prev) => ({ ...prev, accountName: event.target.value }))}
+                  placeholder="NGUYEN VAN A"
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button type="button" disabled={busy === "bank"} onClick={saveBank}>
+                Lưu tài khoản
+              </Button>
+              {bank ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={busy === "bank-del"}
+                  onClick={removeBank}
+                >
+                  Xóa tài khoản
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <aside className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <p className="text-sm font-medium">Tài khoản đã lưu</p>
+            {bank ? (
+              <>
+                <p className="mt-3 text-sm font-semibold">{bank.accountName}</p>
+                <p className="text-sm text-muted-foreground">{bank.bankName}</p>
+                <p className="mt-1 font-mono text-sm tracking-wide">{bank.accountNumber}</p>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {bank.sepayLinked
+                    ? "Đã khớp với tài khoản trên SePay. Đơn học viên sẽ mang mã giảng viên và nhận về đúng STK này."
+                    : "STK chưa có trên SePay LearnHub. Cổng thanh toán vẫn tự xác nhận nhưng sẽ dùng tài khoản mặc định của nền tảng."}
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                Lưu STK để gắn tài khoản nhận học phí với khóa học của bạn.
+              </p>
+            )}
+          </aside>
         </section>
       ) : null}
 

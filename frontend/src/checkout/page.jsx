@@ -432,6 +432,10 @@ function CheckoutStart() {
       if (submitSePayGateway(order)) {
         return;
       }
+      if (order?.orderCode) {
+        window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
+        return;
+      }
       toast.error("Không khởi tạo được thanh toán. Vui lòng thử lại.");
       setSubmitting(false);
     } catch (error) {
@@ -621,7 +625,8 @@ function CheckoutOrder({ orderCode }) {
     if (!order || isPaid(order) || openedRef.current) {
       return;
     }
-    if (new URLSearchParams(window.location.search).get("pay") !== "1") {
+    const result = paymentQuery();
+    if (result === "success" || result === "cancel" || result === "error") {
       return;
     }
     if (!order.gateway?.action) {

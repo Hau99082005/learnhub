@@ -15,11 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.learnhub.backend.modules.cart.services.SePayTransactionClient;
 import com.learnhub.backend.modules.course.repositories.CourseSectionRepository;
 import com.learnhub.backend.modules.course.repositories.LessonRepository;
 import com.learnhub.backend.modules.instructor.dtos.ApplyTemplateRequest;
 import com.learnhub.backend.modules.instructor.dtos.CopyTemplateDTO;
 import com.learnhub.backend.modules.instructor.dtos.CopyTemplateRequest;
+import com.learnhub.backend.modules.instructor.dtos.InstructorBankDTO;
+import com.learnhub.backend.modules.instructor.dtos.InstructorBankRequest;
 import com.learnhub.backend.modules.instructor.dtos.InstructorToolsDTO;
 import com.learnhub.backend.modules.instructor.dtos.PublishCourseDTO;
 import com.learnhub.backend.modules.instructor.dtos.PublishItemDTO;
@@ -27,11 +30,14 @@ import com.learnhub.backend.modules.instructor.dtos.PublishRequest;
 import com.learnhub.backend.modules.instructor.dtos.ToolCheckDTO;
 import com.learnhub.backend.modules.instructor.dtos.ToolCheckRequest;
 import com.learnhub.backend.modules.instructor.models.Course;
+import com.learnhub.backend.modules.instructor.models.InstructorBankAccount;
 import com.learnhub.backend.modules.instructor.models.InstructorCopyTemplate;
 import com.learnhub.backend.modules.instructor.models.InstructorToolCheck;
 import com.learnhub.backend.modules.instructor.repositories.CourseRepository;
+import com.learnhub.backend.modules.instructor.repositories.InstructorBankAccountRepository;
 import com.learnhub.backend.modules.instructor.repositories.InstructorCopyTemplateRepository;
 import com.learnhub.backend.modules.instructor.repositories.InstructorToolCheckRepository;
+import com.learnhub.backend.modules.instructor.support.VnBanks;
 import com.learnhub.backend.modules.user.dtos.userDTO;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
 import com.learnhub.backend.modules.user.models.user;
@@ -63,6 +69,8 @@ public class InstructorToolsService {
     private final LessonRepository lessons;
     private final InstructorToolCheckRepository checks;
     private final InstructorCopyTemplateRepository templates;
+    private final InstructorBankAccountRepository banks;
+    private final SePayTransactionClient sePayTransactions;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public InstructorToolsService(
@@ -72,7 +80,9 @@ public class InstructorToolsService {
             CourseSectionRepository sections,
             LessonRepository lessons,
             InstructorToolCheckRepository checks,
-            InstructorCopyTemplateRepository templates) {
+            InstructorCopyTemplateRepository templates,
+            InstructorBankAccountRepository banks,
+            SePayTransactionClient sePayTransactions) {
         this.userServices = userServices;
         this.users = users;
         this.courses = courses;
@@ -80,6 +90,8 @@ public class InstructorToolsService {
         this.lessons = lessons;
         this.checks = checks;
         this.templates = templates;
+        this.banks = banks;
+        this.sePayTransactions = sePayTransactions;
     }
 
     @Transactional
@@ -183,6 +195,48 @@ public class InstructorToolsService {
         return snapshot(account);
     }
 
+    @Transactional
+    public InstructorToolsDTO saveBank(String authorization, InstructorBankRequest request) {
+        user account = actor(authorization);
+        if (request == null) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Thiếu thông tin tài khoản");
+        }
+        String code = request.getBankCode() == null ? "" : request.getBankCode().trim();
+        if (!VnBanks.known(code)) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Ngân hàng không hợp lệ", "bankCode");
+        }
+        String number = digits(request.getAccountNumber());
+        if (number.length() < 6 || number.length() > 19) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Số tài khoản không hợp lệ", "accountNumber");
+        }
+        String name = request.getAccountName() == null ? "" : request.getAccountName().trim().replaceAll("\\s+", " ");
+        if (name.length() < 4) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng nhập tên chủ tài khoản", "accountName");
+        }
+        InstructorBankAccount row = banks.findByUser_Id(account.getId()).orElseGet(() -> {
+            InstructorBankAccount created = new InstructorBankAccount();
+            created.setUser(account);
+            return created;
+        });
+        row.setBankCode(code);
+        row.setBankName(VnBanks.nameOf(code));
+        row.setAccountNumber(number);
+        row.setAccountName(name.toUpperCase(Locale.ROOT));
+        row.setSepayAccountId(sePayTransactions.findLinkedAccount(number)
+                .map(SePayTransactionClient.LinkedAccount::id)
+                .orElse(null));
+        banks.saveAndFlush(row);
+        return snapshot(account);
+    }
+
+    @Transactional
+    public InstructorToolsDTO deleteBank(String authorization) {
+        user account = actor(authorization);
+        banks.findByUser_Id(account.getId()).ifPresent(banks::delete);
+        banks.flush();
+        return snapshot(account);
+    }
+
     private InstructorToolsDTO snapshot(user account) {
         Map<String, Boolean> checked = new HashMap<>();
         for (InstructorToolCheck row : checks.findByUser_Id(account.getId())) {
@@ -199,7 +253,43 @@ public class InstructorToolsService {
         List<Course> rows = courses.findByInstructorIdAndDeletedAtIsNullOrderByCreatedAtDesc(account.getId());
         Counts counts = counts(rows);
         List<PublishCourseDTO> publish = rows.stream().map(row -> toPublish(row, counts)).toList();
-        return new InstructorToolsDTO(recording, copies, publish);
+        InstructorBankDTO bank = banks.findByUser_Id(account.getId()).map(this::toBank).orElse(null);
+        return new InstructorToolsDTO(recording, copies, publish, bank);
+    }
+
+    private InstructorBankDTO toBank(InstructorBankAccount row) {
+        boolean linked = row.getSepayAccountId() != null && !row.getSepayAccountId().isBlank();
+        if (!linked) {
+            linked = sePayTransactions.findLinkedAccount(row.getAccountNumber()).isPresent();
+        }
+        return new InstructorBankDTO(
+                row.getId(),
+                row.getBankCode(),
+                row.getBankName(),
+                row.getAccountNumber(),
+                row.getAccountName(),
+                qrUrl(row.getBankCode(), row.getAccountNumber()),
+                linked);
+    }
+
+    private String qrUrl(String bank, String account) {
+        if (bank == null || bank.isBlank() || account == null || account.isBlank()) {
+            return "";
+        }
+        return "https://qr.sepay.vn/img?acc=" + encode(account)
+                + "&bank=" + encode(bank)
+                + "&template=compact";
+    }
+
+    private String encode(String value) {
+        return java.net.URLEncoder.encode(value == null ? "" : value, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private String digits(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("\\D+", "");
     }
 
     private void seedTemplates(user account) {

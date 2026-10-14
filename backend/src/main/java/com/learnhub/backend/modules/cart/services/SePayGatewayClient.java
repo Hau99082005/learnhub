@@ -65,11 +65,20 @@ public class SePayGatewayClient {
     }
 
     public SePayGatewayDTO checkoutForm(ShopOrder order) {
+        return checkoutForm(order, CheckoutExtras.empty());
+    }
+
+    public SePayGatewayDTO checkoutForm(ShopOrder order, String customData) {
+        return checkoutForm(order, new CheckoutExtras(customData, "", "", "", ""));
+    }
+
+    public SePayGatewayDTO checkoutForm(ShopOrder order, CheckoutExtras extras) {
         String merchant = trim(sePayProperties.getMerchantId());
         String secret = trim(sePayProperties.getIpnSecret());
         if (merchant.isBlank() || secret.isBlank()) {
             return null;
         }
+        CheckoutExtras hint = extras == null ? CheckoutExtras.empty() : extras;
         String amount = order.getTotalAmount() == null
                 ? "0"
                 : order.getTotalAmount().setScale(0, RoundingMode.DOWN).toPlainString();
@@ -83,14 +92,41 @@ public class SePayGatewayClient {
         fields.put("order_description", "Thanh toan " + invoice);
         fields.put("payment_method", "BANK_TRANSFER");
         fields.put("order_invoice_number", invoice);
+        if (!trim(hint.customerId()).isBlank()) {
+            fields.put("customer_id", trim(hint.customerId()));
+        }
         if (!base.isBlank()) {
             String returnUrl = base + "/thanh-toan/" + invoice;
             fields.put("success_url", returnUrl + "?payment=success");
             fields.put("error_url", returnUrl + "?payment=error");
             fields.put("cancel_url", returnUrl + "?payment=cancel");
         }
+        if (!trim(hint.customData()).isBlank()) {
+            fields.put("custom_data", trim(hint.customData()));
+        }
+        if (!trim(hint.bankAccountId()).isBlank()) {
+            fields.put("bank_account_id", trim(hint.bankAccountId()));
+            if (!trim(hint.accountNumber()).isBlank()) {
+                fields.put("account_number", trim(hint.accountNumber()));
+            }
+            if (!trim(hint.bank()).isBlank()) {
+                fields.put("bank", trim(hint.bank()));
+                fields.put("bank_code", trim(hint.bank()));
+            }
+        }
         fields.put("signature", sign(fields, secret));
         return new SePayGatewayDTO(sePayProperties.getCheckoutUrl(), fields);
+    }
+
+    public record CheckoutExtras(
+            String customData,
+            String customerId,
+            String accountNumber,
+            String bank,
+            String bankAccountId) {
+        public static CheckoutExtras empty() {
+            return new CheckoutExtras("", "", "", "", "");
+        }
     }
 
     public Optional<String> findCaptured(String invoiceNumber, BigDecimal amount) {

@@ -42,6 +42,9 @@ import com.learnhub.backend.modules.cart.repositories.PaymentRepository;
 import com.learnhub.backend.modules.cart.repositories.ShopOrderRepository;
 import com.learnhub.backend.modules.coupon.services.CouponService;
 import com.learnhub.backend.modules.instructor.models.Course;
+import com.learnhub.backend.modules.instructor.models.InstructorBankAccount;
+import com.learnhub.backend.modules.instructor.repositories.InstructorBankAccountRepository;
+import com.learnhub.backend.modules.instructor.support.VnBanks;
 import com.learnhub.backend.modules.notify.models.NotificationJob;
 import com.learnhub.backend.modules.notify.services.NotificationQueue;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
@@ -52,7 +55,7 @@ import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfa
 public class CheckoutService {
     private static final String UNAUTH = "Vui lòng đăng nhập để thanh toán";
     private static final Set<String> PROVIDERS = Set.of("VNPAY", "MOMO", "BANK_TRANSFER");
-    private static final Pattern ORDER_CODE = Pattern.compile("LH[0-9A-Z]+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ORDER_CODE = Pattern.compile("(?:GV\\d+|LH)[0-9A-Z]+", Pattern.CASE_INSENSITIVE);
 
     private final CartRepository carts;
     private final CartItemRepository cartItems;
@@ -66,6 +69,7 @@ public class CheckoutService {
     private final SePayProperties sePayProperties;
     private final SePayTransactionClient sePayTransactions;
     private final SePayGatewayClient sePayGateway;
+    private final InstructorBankAccountRepository instructorBanks;
 
     public CheckoutService(
             CartRepository carts,
@@ -79,7 +83,8 @@ public class CheckoutService {
             NotificationQueue notificationQueue,
             SePayProperties sePayProperties,
             SePayTransactionClient sePayTransactions,
-            SePayGatewayClient sePayGateway) {
+            SePayGatewayClient sePayGateway,
+            InstructorBankAccountRepository instructorBanks) {
         this.carts = carts;
         this.cartItems = cartItems;
         this.orders = orders;
@@ -92,6 +97,7 @@ public class CheckoutService {
         this.sePayProperties = sePayProperties;
         this.sePayTransactions = sePayTransactions;
         this.sePayGateway = sePayGateway;
+        this.instructorBanks = instructorBanks;
     }
 
     @Transactional
@@ -104,6 +110,7 @@ public class CheckoutService {
         if (rows.isEmpty()) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Giỏ hàng của bạn đang trống");
         }
+        List<Course> courseList = rows.stream().map(CartItem::getCourse).toList();
         for (CartItem row : rows) {
             Course course = row.getCourse();
             if (course.getDeletedAt() != null || !"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
@@ -126,7 +133,7 @@ public class CheckoutService {
         }
         ShopOrder order = new ShopOrder();
         order.setUser(account);
-        order.setOrderCode(nextOrderCode());
+        order.setOrderCode(nextOrderCode(singleInstructorId(courseList)));
         order.setSubtotal(subtotal);
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setTotalAmount(subtotal);
@@ -156,6 +163,7 @@ public class CheckoutService {
         payment.setStatus("PENDING");
         payment.setCheckoutUrl("/thanh-toan/" + order.getOrderCode());
         payment.setProviderTxnId(provider + "-" + order.getOrderCode());
+        applyPayee(payment, courseList);
         payments.save(payment);
         cart.setStatus("CHECKED_OUT");
         carts.save(cart);
@@ -309,7 +317,7 @@ public class CheckoutService {
             settlePaid(order, payment, captured.get());
             return;
         }
-        sePayTransactions.findPaid(order.getOrderCode(), order.getTotalAmount())
+        sePayTransactions.findPaid(order.getOrderCode(), order.getTotalAmount(), payment.getPayeeAccountNumber())
                 .ifPresent((hit) -> settlePaid(order, payment, hit.txnId()));
     }
 
@@ -425,14 +433,15 @@ public class CheckoutService {
         return provider;
     }
 
-    private String nextOrderCode() {
+    private String nextOrderCode(Long instructorId) {
+        String prefix = instructorId == null ? "LH" : "GV" + instructorId;
         for (int attempt = 0; attempt < 8; attempt += 1) {
-            String code = "LH" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
+            String code = prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
             if (!orders.existsByOrderCode(code)) {
                 return code;
             }
         }
-        return "LH" + Long.toString(Math.abs(System.nanoTime()), 36).toUpperCase(Locale.ROOT);
+        return prefix + Long.toString(Math.abs(System.nanoTime()), 36).toUpperCase(Locale.ROOT);
     }
 
     private boolean sePayAuthorized(String authorization) {
@@ -529,9 +538,7 @@ public class CheckoutService {
         return "";
     }
 
-    private String qrUrl(ShopOrder order) {
-        String acc = sePayProperties.getAccountNumber();
-        String bank = sePayProperties.getBank();
+    private String qrUrl(ShopOrder order, String bank, String acc) {
         if (acc == null || acc.isBlank() || bank == null || bank.isBlank()) {
             return "";
         }
@@ -547,31 +554,143 @@ public class CheckoutService {
                 + "&template=compact";
     }
 
+    private void applyPayee(Payment payment, List<Course> courses) {
+        Payee payee = resolvePayee(courses);
+        payment.setPayeeBank(payee.bank());
+        payment.setPayeeAccountNumber(payee.accountNumber());
+        payment.setPayeeAccountName(payee.accountName());
+    }
+
+    private Payee resolvePayee(List<Course> courses) {
+        Long instructorId = singleInstructorId(courses);
+        if (instructorId != null) {
+            Optional<InstructorBankAccount> saved = instructorBanks.findByUser_Id(instructorId);
+            if (saved.isPresent()) {
+                InstructorBankAccount row = saved.get();
+                if (filled(row.getBankCode()) && filled(row.getAccountNumber()) && filled(row.getAccountName())) {
+                    String sepayId = trimToEmpty(row.getSepayAccountId());
+                    if (sepayId.isBlank()) {
+                        Optional<SePayTransactionClient.LinkedAccount> linked =
+                                sePayTransactions.findLinkedAccount(row.getAccountNumber());
+                        if (linked.isPresent()) {
+                            sepayId = linked.get().id();
+                            row.setSepayAccountId(sepayId);
+                            instructorBanks.save(row);
+                        }
+                    }
+                    return new Payee(
+                            row.getBankCode(),
+                            row.getAccountNumber(),
+                            row.getAccountName(),
+                            instructorId,
+                            sepayId);
+                }
+            }
+            return platformPayee(instructorId);
+        }
+        return platformPayee(null);
+    }
+
+    private Long singleInstructorId(List<Course> courses) {
+        Long instructorId = null;
+        if (courses == null) {
+            return null;
+        }
+        for (Course course : courses) {
+            if (course == null || course.getInstructor() == null || course.getInstructor().getId() == null) {
+                continue;
+            }
+            Long id = course.getInstructor().getId();
+            if (instructorId == null) {
+                instructorId = id;
+            } else if (!instructorId.equals(id)) {
+                return null;
+            }
+        }
+        return instructorId;
+    }
+
+    private Payee payeeOf(Payment payment, List<OrderItem> items) {
+        Payee fromCourses = resolvePayee(items.stream().map(OrderItem::getCourse).toList());
+        if (payment != null && filled(payment.getPayeeAccountNumber()) && filled(payment.getPayeeBank())) {
+            return new Payee(
+                    payment.getPayeeBank(),
+                    payment.getPayeeAccountNumber(),
+                    firstNonBlank(payment.getPayeeAccountName(), sePayProperties.getAccountName()),
+                    fromCourses.instructorId(),
+                    fromCourses.sepayAccountId());
+        }
+        return fromCourses;
+    }
+
+    private Payee platformPayee(Long instructorId) {
+        return new Payee(
+                firstNonBlank(sePayProperties.getBank(), "MBBank"),
+                firstNonBlank(sePayProperties.getAccountNumber(), ""),
+                firstNonBlank(sePayProperties.getAccountName(), "LE VAN HAU"),
+                instructorId,
+                "");
+    }
+
+    private boolean filled(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String trimToEmpty(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private record Payee(
+            String bank,
+            String accountNumber,
+            String accountName,
+            Long instructorId,
+            String sepayAccountId) {
+    }
+
     private String encode(String value) {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
     private CheckoutDTO toDto(ShopOrder order, Payment payment) {
-        List<CheckoutItemDTO> items = orderItems.findByOrderIdWithCourse(order.getId()).stream()
-                .map(this::toItemDto)
-                .toList();
+        List<OrderItem> rows = orderItems.findByOrderIdWithCourse(order.getId());
+        List<CheckoutItemDTO> items = rows.stream().map(this::toItemDto).toList();
+        Payee payee = payeeOf(payment, rows);
+        if ("BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())
+                && (!filled(payment.getPayeeAccountNumber()) || !filled(payment.getPayeeBank()))) {
+            applyPayee(payment, rows.stream().map(OrderItem::getCourse).toList());
+            payments.save(payment);
+            payee = payeeOf(payment, rows);
+        }
         BankTransferDTO bank = null;
         if ("BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
-            String bankName = firstNonBlank(sePayProperties.getBank(), "MBBank");
-            String accountName = firstNonBlank(sePayProperties.getAccountName(), "LE VAN HAU");
-            String accountNumber = firstNonBlank(sePayProperties.getAccountNumber(), "");
             String sync = firstNonBlank(sePayGateway.lastMessage(), sePayTransactions.lastMessage());
+            String code = firstNonBlank(payee.bank(), sePayProperties.getBank(), "MBBank");
             bank = new BankTransferDTO(
-                    bankName,
-                    accountName,
-                    accountNumber,
+                    code,
+                    firstNonBlank(VnBanks.nameOf(code), code),
+                    payee.accountName(),
+                    payee.accountNumber(),
                     order.getOrderCode(),
-                    qrUrl(order),
+                    qrUrl(order, code, payee.accountNumber()),
                     sync);
         }
         SePayGatewayDTO gateway = null;
         if ("PENDING".equalsIgnoreCase(order.getStatus())) {
-            gateway = sePayGateway.checkoutForm(order);
+            String custom = filled(payee.accountNumber())
+                    ? firstNonBlank(payee.bank(), "") + "|" + payee.accountNumber()
+                    : "";
+            String customerId = payee.instructorId() != null
+                    ? "GV" + payee.instructorId()
+                    : "U" + order.getUser().getId();
+            gateway = sePayGateway.checkoutForm(
+                    order,
+                    new SePayGatewayClient.CheckoutExtras(
+                            custom,
+                            customerId,
+                            payee.accountNumber(),
+                            payee.bank(),
+                            trimToEmpty(payee.sepayAccountId())));
         }
         return new CheckoutDTO(
                 order.getId(),

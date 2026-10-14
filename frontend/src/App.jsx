@@ -22,6 +22,7 @@ import SettingsPage from "@/settings/page"
 import LearningPage from "@/learning/page"
 import CoursePlayerPage from "@/learn/page"
 import NotificationsPage from "@/notifications/page"
+import PaymentMethodsPage from "@/payments/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast, onAuthChange } from "@/lib/auth"
 import { hydrateOwned } from "@/lib/courseAccess"
@@ -139,6 +140,8 @@ function App() {
             <SettingsPage />
           ) : path === "/thong-bao" ? (
             <NotificationsPage />
+          ) : path === "/phuong-thuc-thanh-toan" ? (
+            <PaymentMethodsPage />
           ) : path === "/gioi-thieu" ? (
             <About />
           ) : path === "/tin-tuc" || path.startsWith("/tin-tuc/") ? (

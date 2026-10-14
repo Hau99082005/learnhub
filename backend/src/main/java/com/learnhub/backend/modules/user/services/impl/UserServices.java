@@ -324,6 +324,17 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
         return toUserDto(account);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public userDTO requireInstructor(String authorization) {
+        user account = requireAccount(authorization);
+        UserRole role = resolveRole(account);
+        if (role != UserRole.INSTRUCTOR && role != UserRole.ADMIN) {
+            throw new AuthException(HttpStatus.FORBIDDEN, "Bạn cần tài khoản giảng viên");
+        }
+        return toUserDto(account);
+    }
+
     private LoginReponse toAuthResponse(user account) {
         String token = UUID.randomUUID().toString();
         sessions.save(token, account.getId());

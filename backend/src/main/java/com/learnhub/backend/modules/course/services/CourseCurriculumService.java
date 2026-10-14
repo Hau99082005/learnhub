@@ -25,6 +25,7 @@ import com.learnhub.backend.modules.instructor.models.Course;
 import com.learnhub.backend.modules.instructor.repositories.CourseRepository;
 import com.learnhub.backend.modules.user.dtos.userDTO;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
+import com.learnhub.backend.modules.user.models.UserRole;
 import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfaces;
 
 @Service
@@ -58,15 +59,13 @@ public class CourseCurriculumService {
 
     @Transactional(readOnly = true)
     public List<CourseSectionDTO> listAdmin(String authorization, Long courseId) {
-        userServices.requireAdmin(authorization);
-        requireCourse(courseId);
+        requireManagedCourse(authorization, courseId);
         return list(courseId, true);
     }
 
     @Transactional
     public CourseSectionDTO createSection(String authorization, Long courseId, SectionRequest request) {
-        userServices.requireAdmin(authorization);
-        Course course = requireCourse(courseId);
+        Course course = requireManagedCourse(authorization, courseId);
         String title = requireTitle(request == null ? null : request.getTitle());
         CourseSection section = new CourseSection();
         section.setCourse(course);
@@ -79,7 +78,7 @@ public class CourseCurriculumService {
 
     @Transactional
     public CourseSectionDTO updateSection(String authorization, Long courseId, Long sectionId, SectionRequest request) {
-        userServices.requireAdmin(authorization);
+        requireManagedCourse(authorization, courseId);
         CourseSection section = requireSection(courseId, sectionId);
         if (request != null && request.getTitle() != null) {
             section.setTitle(requireTitle(request.getTitle()));
@@ -93,7 +92,7 @@ public class CourseCurriculumService {
 
     @Transactional
     public void deleteSection(String authorization, Long courseId, Long sectionId) {
-        userServices.requireAdmin(authorization);
+        requireManagedCourse(authorization, courseId);
         CourseSection section = requireSection(courseId, sectionId);
         List<Lesson> items = lessons.findBySectionIdOrderBySortOrderAscIdAsc(sectionId);
         for (Lesson lesson : items) {
@@ -107,7 +106,7 @@ public class CourseCurriculumService {
 
     @Transactional
     public List<CourseSectionDTO> moveSection(String authorization, Long courseId, Long sectionId, String direction) {
-        userServices.requireAdmin(authorization);
+        requireManagedCourse(authorization, courseId);
         requireSection(courseId, sectionId);
         List<CourseSection> items = new ArrayList<>(sections.findByCourseIdOrderBySortOrderAscIdAsc(courseId));
         int index = indexOfSection(items, sectionId);
@@ -127,7 +126,7 @@ public class CourseCurriculumService {
 
     @Transactional
     public LessonDTO createLesson(String authorization, Long courseId, Long sectionId, LessonRequest request) {
-        userDTO admin = requireAdmin(authorization);
+        userDTO admin = requireEditor(authorization, courseId);
         CourseSection section = requireSection(courseId, sectionId);
         String title = requireTitle(request == null ? null : request.getTitle());
         String videoUrl = request == null ? null : trimToNull(request.getVideoUrl(), 1000);
@@ -156,7 +155,7 @@ public class CourseCurriculumService {
             Long sectionId,
             Long lessonId,
             LessonRequest request) {
-        userDTO admin = requireAdmin(authorization);
+        userDTO admin = requireEditor(authorization, courseId);
         requireSection(courseId, sectionId);
         Lesson lesson = requireLesson(sectionId, lessonId);
         if (request != null && request.getTitle() != null) {
@@ -188,7 +187,7 @@ public class CourseCurriculumService {
 
     @Transactional
     public void deleteLesson(String authorization, Long courseId, Long sectionId, Long lessonId) {
-        userServices.requireAdmin(authorization);
+        requireManagedCourse(authorization, courseId);
         requireSection(courseId, sectionId);
         Lesson lesson = requireLesson(sectionId, lessonId);
         detachMedia(lesson);
@@ -204,7 +203,7 @@ public class CourseCurriculumService {
             Long sectionId,
             Long lessonId,
             String direction) {
-        userServices.requireAdmin(authorization);
+        requireManagedCourse(authorization, courseId);
         requireSection(courseId, sectionId);
         requireLesson(sectionId, lessonId);
         List<Lesson> items = new ArrayList<>(lessons.findBySectionIdOrderBySortOrderAscIdAsc(sectionId));
@@ -348,8 +347,23 @@ public class CourseCurriculumService {
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy bài giảng"));
     }
 
-    private userDTO requireAdmin(String authorization) {
-        return userServices.requireAdmin(authorization);
+    private userDTO requireEditor(String authorization, Long courseId) {
+        userDTO actor = userServices.requireInstructor(authorization);
+        requireManagedCourse(authorization, courseId);
+        return actor;
+    }
+
+    private Course requireManagedCourse(String authorization, Long courseId) {
+        userDTO actor = userServices.requireInstructor(authorization);
+        Course course = requireCourse(courseId);
+        if (UserRole.from(actor.getRole()) == UserRole.ADMIN) {
+            return course;
+        }
+        Long ownerId = course.getInstructor() == null ? null : course.getInstructor().getId();
+        if (ownerId == null || !ownerId.equals(actor.getId())) {
+            throw new AuthException(HttpStatus.FORBIDDEN, "Bạn không thể sửa khóa học này");
+        }
+        return course;
     }
 
     private String uniqueLessonSlug(Long sectionId, String title, Long excludeId) {

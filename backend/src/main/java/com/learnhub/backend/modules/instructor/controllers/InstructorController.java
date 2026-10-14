@@ -8,8 +8,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.learnhub.backend.modules.instructor.dtos.CourseDTO;
-import com.learnhub.backend.modules.instructor.dtos.CourseRequest;
 import com.learnhub.backend.modules.instructor.dtos.InstructorOnboardingDTO;
 import com.learnhub.backend.modules.instructor.dtos.InstructorOnboardingRequest;
 import com.learnhub.backend.modules.instructor.dtos.InstructorStudioDTO;
@@ -41,12 +39,5 @@ public class InstructorController {
     public ResponseEntity<InstructorStudioDTO> studio(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         return ResponseEntity.ok(instructorServices.studio(authorization));
-    }
-
-    @PostMapping("/courses")
-    public ResponseEntity<CourseDTO> createCourse(
-            @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestBody CourseRequest request) {
-        return ResponseEntity.ok(instructorServices.createCourse(authorization, request));
     }
 }

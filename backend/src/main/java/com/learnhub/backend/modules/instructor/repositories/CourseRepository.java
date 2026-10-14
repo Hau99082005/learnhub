@@ -13,6 +13,8 @@ import com.learnhub.backend.modules.instructor.models.Course;
 public interface CourseRepository extends JpaRepository<Course, Long> {
     List<Course> findByInstructorIdOrderByCreatedAtDesc(Long instructorId);
 
+    List<Course> findByInstructorIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long instructorId);
+
     List<Course> findByDeletedAtIsNullOrderByCreatedAtDesc();
 
     List<Course> findByDeletedAtIsNullAndStatusOrderByPublishedAtDesc(String status);

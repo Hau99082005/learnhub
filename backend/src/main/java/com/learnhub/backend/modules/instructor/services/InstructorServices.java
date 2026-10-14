@@ -144,7 +144,7 @@ public class InstructorServices {
         InstructorOnboardingDTO onboarding = onboardings.findByUserId(account.getId())
                 .map(this::toOnboardingDto)
                 .orElse(null);
-        List<CourseDTO> list = courses.findByInstructorIdOrderByCreatedAtDesc(account.getId())
+        List<CourseDTO> list = courses.findByInstructorIdAndDeletedAtIsNullOrderByCreatedAtDesc(account.getId())
                 .stream()
                 .map(this::toCourseDto)
                 .toList();

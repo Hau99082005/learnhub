@@ -30,5 +30,7 @@ public interface UserServicesInterfaces {
 
     userDTO requireAdmin(String authorization);
 
+    userDTO requireInstructor(String authorization);
+
     user requireAccount(String authorization);
 }

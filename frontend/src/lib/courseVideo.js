@@ -2,12 +2,16 @@ import { authForm, authPost, getAuthToken } from "@/lib/auth";
 
 const CHUNK_SIZE = 8 * 1024 * 1024;
 
-export async function uploadCourseVideo(file, onProgress) {
+export async function uploadCourseVideo(
+  file,
+  onProgress,
+  videoBase = "/api/admin/courses/videos",
+) {
   if (!file) {
     throw new Error("Vui lòng chọn video");
   }
   const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
-  const session = await authPost("/api/admin/courses/videos", {
+  const session = await authPost(videoBase, {
     filename: file.name,
     size: file.size,
     contentType: file.type || "video/mp4",
@@ -19,7 +23,7 @@ export async function uploadCourseVideo(file, onProgress) {
       const payload = new FormData();
       payload.append("chunk", blob, `${file.name}.part${index}`);
       await authForm(
-        `/api/admin/courses/videos/${session.sessionId}/chunks/${index}`,
+        `${videoBase}/${session.sessionId}/chunks/${index}`,
         payload,
         "PUT",
       );
@@ -28,7 +32,7 @@ export async function uploadCourseVideo(file, onProgress) {
       }
     }
     const ready = await authPost(
-      `/api/admin/courses/videos/${session.sessionId}/complete`,
+      `${videoBase}/${session.sessionId}/complete`,
       {},
     );
     if (onProgress) {
@@ -37,7 +41,7 @@ export async function uploadCourseVideo(file, onProgress) {
     return ready;
   } catch (error) {
     const token = getAuthToken();
-    fetch(`/api/admin/courses/videos/${session.sessionId}`, {
+    fetch(`${videoBase}/${session.sessionId}`, {
       method: "DELETE",
       headers: { Authorization: token ? `Bearer ${token}` : "" },
     }).catch(() => {});

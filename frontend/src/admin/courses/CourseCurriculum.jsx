@@ -69,7 +69,7 @@ function fileTitle(file) {
   return file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
 }
 
-function CourseCurriculum({ course, onBack }) {
+function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -85,7 +85,8 @@ function CourseCurriculum({ course, onBack }) {
   const [playingId, setPlayingId] = useState(null);
 
   const courseId = course?.id;
-  const path = courseId ? `/api/admin/courses/${courseId}/sections` : "";
+  const path = apiBase || (courseId ? `/api/admin/courses/${courseId}/sections` : "");
+  const videosUrl = videoBase || "/api/admin/courses/videos";
 
   const load = async () => {
     if (!courseId) {
@@ -260,7 +261,7 @@ function CourseCurriculum({ course, onBack }) {
         const ready = await uploadCourseVideo(file, (value) => {
           const overall = Math.round(((index + value / 100) / files.length) * 100);
           setProgress((prev) => ({ ...prev, [section.id]: overall }));
-        });
+        }, videosUrl);
         const custom = (lessonTitle[section.id] || "").trim();
         const title =
           files.length === 1 && custom ? custom : fileTitle(file);
@@ -311,7 +312,7 @@ function CourseCurriculum({ course, onBack }) {
     try {
       const ready = await uploadCourseVideo(next, (value) => {
         setProgress((prev) => ({ ...prev, [key]: value }));
-      });
+      }, videosUrl);
       await authPut(`${path}/${section.id}/lessons/${lesson.id}`, {
         videoUrl: ready.previewVideo,
         durationSeconds: ready.durationSeconds || 0,

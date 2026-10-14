@@ -22,7 +22,7 @@ import com.learnhub.backend.modules.course.dtos.SectionRequest;
 import com.learnhub.backend.modules.course.services.CourseCurriculumService;
 
 @RestController
-@RequestMapping("/api/admin/courses/{courseId}/sections")
+@RequestMapping({"/api/admin/courses/{courseId}/sections", "/api/instructor/courses/{courseId}/sections"})
 public class AdminCourseSectionController {
     private final CourseCurriculumService curriculum;
 

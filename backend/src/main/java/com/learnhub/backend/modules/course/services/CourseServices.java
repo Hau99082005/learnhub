@@ -195,6 +195,62 @@ public class CourseServices {
         courses.flush();
     }
 
+    @Transactional(readOnly = true)
+    public List<CourseAdminDTO> listForInstructor(String authorization) {
+        user account = requireInstructorAccount(authorization);
+        return courses.findByInstructorIdAndDeletedAtIsNullOrderByCreatedAtDesc(account.getId())
+                .stream()
+                .map(this::toAdminDto)
+                .toList();
+    }
+
+    @Transactional
+    public CourseAdminDTO createForInstructor(String authorization, AdminCourseRequest request, MultipartFile image) {
+        user account = requireInstructorAccount(authorization);
+        if (request == null) {
+            request = new AdminCourseRequest();
+        }
+        request.setInstructorId(account.getId());
+        Course item = new Course();
+        apply(item, request, images.save(image), true, account);
+        courses.saveAndFlush(item);
+        return toAdminDto(item);
+    }
+
+    @Transactional
+    public CourseAdminDTO updateForInstructor(
+            String authorization,
+            Long id,
+            AdminCourseRequest request,
+            MultipartFile image) {
+        user account = requireInstructorAccount(authorization);
+        Course item = requireOwnedCourse(id, account);
+        String imageUrl = item.getImages();
+        if (image != null && !image.isEmpty()) {
+            String next = images.save(image);
+            images.deleteIfOwned(imageUrl);
+            imageUrl = next;
+        }
+        if (request == null) {
+            request = new AdminCourseRequest();
+        }
+        request.setInstructorId(account.getId());
+        apply(item, request, imageUrl, false, account);
+        courses.saveAndFlush(item);
+        return toAdminDto(item);
+    }
+
+    @Transactional
+    public void deleteForInstructor(String authorization, Long id) {
+        user account = requireInstructorAccount(authorization);
+        Course item = requireOwnedCourse(id, account);
+        images.deleteIfOwned(item.getImages());
+        videos.deleteIfOwned(item.getPreviewVideo());
+        deleteDependents(item.getId());
+        courses.delete(item);
+        courses.flush();
+    }
+
     private void apply(
             Course item,
             AdminCourseRequest request,
@@ -343,6 +399,23 @@ public class CourseServices {
     private user requireAdminAccount(String authorization) {
         return users.findById(userServices.requireAdmin(authorization).getId())
                 .orElseThrow(() -> new AuthException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+    }
+
+    private user requireInstructorAccount(String authorization) {
+        return users.findById(userServices.requireInstructor(authorization).getId())
+                .orElseThrow(() -> new AuthException(HttpStatus.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ"));
+    }
+
+    private Course requireOwnedCourse(Long id, user account) {
+        Course item = requireCourse(id);
+        if (UserRole.from(account.getRole()) == UserRole.ADMIN) {
+            return item;
+        }
+        Long ownerId = item.getInstructor() == null ? null : item.getInstructor().getId();
+        if (ownerId == null || !ownerId.equals(account.getId())) {
+            throw new AuthException(HttpStatus.FORBIDDEN, "Bạn không thể sửa khóa học này");
+        }
+        return item;
     }
 
     private String uniqueSlug(String base, Long excludeId) {

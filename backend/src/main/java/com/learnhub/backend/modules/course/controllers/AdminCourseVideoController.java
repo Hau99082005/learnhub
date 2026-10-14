@@ -21,7 +21,7 @@ import com.learnhub.backend.modules.course.services.CourseVideoStorage;
 import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfaces;
 
 @RestController
-@RequestMapping("/api/admin/courses/videos")
+@RequestMapping({"/api/admin/courses/videos", "/api/instructor/courses/videos"})
 public class AdminCourseVideoController {
     private final CourseVideoStorage videos;
     private final UserServicesInterfaces userServices;
@@ -35,7 +35,7 @@ public class AdminCourseVideoController {
     public ResponseEntity<VideoSessionDTO> init(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody VideoInitRequest request) {
-        userServices.requireAdmin(authorization);
+        userServices.requireInstructor(authorization);
         return ResponseEntity.status(HttpStatus.CREATED).body(videos.init(request));
     }
 
@@ -45,7 +45,7 @@ public class AdminCourseVideoController {
             @PathVariable String sessionId,
             @PathVariable int index,
             @RequestParam("chunk") MultipartFile chunk) {
-        userServices.requireAdmin(authorization);
+        userServices.requireInstructor(authorization);
         videos.saveChunk(sessionId, index, chunk);
         return ResponseEntity.noContent().build();
     }
@@ -54,7 +54,7 @@ public class AdminCourseVideoController {
     public ResponseEntity<VideoReadyDTO> complete(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable String sessionId) {
-        userServices.requireAdmin(authorization);
+        userServices.requireInstructor(authorization);
         return ResponseEntity.ok(videos.complete(sessionId));
     }
 
@@ -62,7 +62,7 @@ public class AdminCourseVideoController {
     public ResponseEntity<Void> abort(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable String sessionId) {
-        userServices.requireAdmin(authorization);
+        userServices.requireInstructor(authorization);
         videos.abort(sessionId);
         return ResponseEntity.noContent().build();
     }

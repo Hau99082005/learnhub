@@ -67,7 +67,14 @@ function statusLabel(value) {
   return STATUSES.find((item) => item.value === value)?.label || value;
 }
 
-const AllCourse = () => {
+const AllCourse = ({
+  apiBase = "/api/admin/courses",
+  categoriesUrl = "/api/admin/categories",
+  showInstructor = true,
+  curriculumHref = (id) => `/admin/courses/${id}/phan-hoc`,
+  listHref = "/admin/courses",
+  pathPattern = /^\/(?:admin|quan-tri)\/courses\/(\d+)\/phan-hoc$/,
+} = {}) => {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [instructors, setInstructors] = useState([]);
@@ -86,11 +93,11 @@ const AllCourse = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [courses, cats, teachers] = await Promise.all([
-        authGet("/api/admin/courses"),
-        authGet("/api/admin/categories"),
-        authGet("/api/admin/courses/instructors"),
-      ]);
+      const tasks = [authGet(apiBase), authGet(categoriesUrl)];
+      if (showInstructor) {
+        tasks.push(authGet(`${apiBase}/instructors`));
+      }
+      const [courses, cats, teachers] = await Promise.all(tasks);
       setItems(Array.isArray(courses) ? courses : []);
       setCategories(Array.isArray(cats) ? cats : []);
       setInstructors(Array.isArray(teachers) ? teachers : []);
@@ -215,7 +222,7 @@ const AllCourse = () => {
     setUploadingVideo(true);
     setVideoProgress(1);
     try {
-      const ready = await uploadCourseVideo(videoFile, setVideoProgress);
+      const ready = await uploadCourseVideo(videoFile, setVideoProgress, `${apiBase}/videos`);
       setForm((prev) => ({
         ...prev,
         previewVideo: ready.previewVideo,
@@ -250,7 +257,7 @@ const AllCourse = () => {
       if (videoFile) {
         setUploadingVideo(true);
         setVideoProgress(1);
-        const ready = await uploadCourseVideo(videoFile, setVideoProgress);
+        const ready = await uploadCourseVideo(videoFile, setVideoProgress, `${apiBase}/videos`);
         previewVideo = ready.previewVideo || previewVideo;
         durationSeconds = ready.durationSeconds || durationSeconds;
         setForm((prev) => ({
@@ -284,7 +291,7 @@ const AllCourse = () => {
     payload.append("durationSeconds", String(durationSeconds || 0));
     payload.append("whatYouWillLearn", form.whatYouWillLearn);
     payload.append("requirements", form.requirements);
-    if (form.instructorId) {
+    if (showInstructor && form.instructorId) {
       payload.append("instructorId", form.instructorId);
     }
     if (form.categoryId) {
@@ -298,10 +305,10 @@ const AllCourse = () => {
     }
     try {
       if (editing) {
-        await authForm(`/api/admin/courses/${editing.id}`, payload, "POST");
+        await authForm(`${apiBase}/${editing.id}`, payload, "POST");
         toast.success("Đã cập nhật khóa học");
       } else {
-        await authForm("/api/admin/courses", payload, "POST");
+        await authForm(apiBase, payload, "POST");
         toast.success("Đã tạo khóa học");
       }
       setFormOpen(false);
@@ -320,7 +327,7 @@ const AllCourse = () => {
     }
     setSaving(true);
     try {
-      await authDelete(`/api/admin/courses/${editing.id}`);
+      await authDelete(`${apiBase}/${editing.id}`);
       toast.success("Đã xóa khóa học");
       setDeleteOpen(false);
       setEditing(null);
@@ -334,7 +341,7 @@ const AllCourse = () => {
 
   const countLabel = useMemo(() => `${items.length} khóa học`, [items.length]);
   const path = window.location.pathname;
-  const curriculumMatch = path.match(/^\/(?:admin|quan-tri)\/courses\/(\d+)\/phan-hoc$/);
+  const curriculumMatch = path.match(pathPattern);
   const curriculumId = curriculumMatch ? Number(curriculumMatch[1]) : null;
   const curriculumCourse = curriculumId
     ? items.find((item) => Number(item.id) === curriculumId)
@@ -348,7 +355,7 @@ const AllCourse = () => {
       return (
         <section className="space-y-3">
           <h1 className="text-2xl font-semibold tracking-tight">Không tìm thấy khóa học</h1>
-          <Button type="button" onClick={() => (window.location.href = "/admin/courses")}>
+          <Button type="button" onClick={() => (window.location.href = listHref)}>
             Về danh sách khóa học
           </Button>
         </section>
@@ -357,8 +364,10 @@ const AllCourse = () => {
     return (
       <CourseCurriculum
         course={curriculumCourse}
+        apiBase={`${apiBase}/${curriculumCourse.id}/sections`}
+        videoBase={`${apiBase}/videos`}
         onBack={() => {
-          window.location.href = "/admin/courses";
+          window.location.href = listHref;
         }}
       />
     );
@@ -494,7 +503,7 @@ const AllCourse = () => {
                     type="button"
                     className="flex-1"
                     onClick={() => {
-                      window.location.href = `/admin/courses/${item.id}/phan-hoc`;
+                      window.location.href = curriculumHref(item.id);
                     }}
                   >
                     <BookOpen className="size-4" />
@@ -637,29 +646,31 @@ const AllCourse = () => {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="course-instructor">Giảng viên</Label>
-                <select
-                  id="course-instructor"
-                  className={SELECT_CLASS}
-                  value={form.instructorId}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      instructorId: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="" className={OPTION_CLASS}>
-                    Tài khoản admin hiện tại
-                  </option>
-                  {instructors.map((item) => (
-                    <option key={item.id} value={item.id} className={OPTION_CLASS}>
-                      {item.fullName} ({item.email})
+              {showInstructor ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="course-instructor">Giảng viên</Label>
+                  <select
+                    id="course-instructor"
+                    className={SELECT_CLASS}
+                    value={form.instructorId}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        instructorId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="" className={OPTION_CLASS}>
+                      Tài khoản admin hiện tại
                     </option>
-                  ))}
-                </select>
-              </div>
+                    {instructors.map((item) => (
+                      <option key={item.id} value={item.id} className={OPTION_CLASS}>
+                        {item.fullName} ({item.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               <div className="grid gap-2">
                 <Label htmlFor="course-category">Danh mục</Label>
                 <select
@@ -863,7 +874,7 @@ const AllCourse = () => {
                   variant="outline"
                   className="sm:mr-auto"
                   onClick={() => {
-                    window.location.href = `/admin/courses/${editing.id}/phan-hoc`;
+                    window.location.href = curriculumHref(editing.id);
                   }}
                 >
                   <BookOpen className="size-4" />

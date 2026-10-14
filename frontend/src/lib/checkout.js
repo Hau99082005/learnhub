@@ -1,7 +1,7 @@
 import { authGet, authPost } from "@/lib/auth";
 
-export async function createCheckout(provider) {
-  return authPost("/api/checkout", { provider });
+export async function createCheckout(provider, couponCode) {
+  return authPost("/api/checkout", { provider, couponCode: couponCode || "" });
 }
 
 export async function getCheckout(orderCode) {

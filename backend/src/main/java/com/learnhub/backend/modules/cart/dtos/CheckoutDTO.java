@@ -10,7 +10,9 @@ public class CheckoutDTO {
     private final String provider;
     private final String paymentStatus;
     private final BigDecimal subtotal;
+    private final BigDecimal discountAmount;
     private final BigDecimal totalAmount;
+    private final String couponCode;
     private final String currency;
     private final String checkoutUrl;
     private final BankTransferDTO bankTransfer;
@@ -24,7 +26,9 @@ public class CheckoutDTO {
             String provider,
             String paymentStatus,
             BigDecimal subtotal,
+            BigDecimal discountAmount,
             BigDecimal totalAmount,
+            String couponCode,
             String currency,
             String checkoutUrl,
             BankTransferDTO bankTransfer,
@@ -36,7 +40,9 @@ public class CheckoutDTO {
         this.provider = provider;
         this.paymentStatus = paymentStatus;
         this.subtotal = subtotal;
+        this.discountAmount = discountAmount;
         this.totalAmount = totalAmount;
+        this.couponCode = couponCode;
         this.currency = currency;
         this.checkoutUrl = checkoutUrl;
         this.bankTransfer = bankTransfer;
@@ -68,8 +74,16 @@ public class CheckoutDTO {
         return subtotal;
     }
 
+    public BigDecimal getDiscountAmount() {
+        return discountAmount;
+    }
+
     public BigDecimal getTotalAmount() {
         return totalAmount;
+    }
+
+    public String getCouponCode() {
+        return couponCode;
     }
 
     public String getCurrency() {

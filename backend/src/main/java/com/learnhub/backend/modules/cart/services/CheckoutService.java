@@ -17,6 +17,8 @@ import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.learnhub.backend.config.SePayProperties;
 import com.learnhub.backend.modules.cart.dtos.BankTransferDTO;
@@ -38,7 +40,10 @@ import com.learnhub.backend.modules.cart.repositories.EnrollmentRepository;
 import com.learnhub.backend.modules.cart.repositories.OrderItemRepository;
 import com.learnhub.backend.modules.cart.repositories.PaymentRepository;
 import com.learnhub.backend.modules.cart.repositories.ShopOrderRepository;
+import com.learnhub.backend.modules.coupon.services.CouponService;
 import com.learnhub.backend.modules.instructor.models.Course;
+import com.learnhub.backend.modules.notify.models.NotificationJob;
+import com.learnhub.backend.modules.notify.services.NotificationQueue;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
 import com.learnhub.backend.modules.user.models.user;
 import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfaces;
@@ -56,6 +61,8 @@ public class CheckoutService {
     private final PaymentRepository payments;
     private final EnrollmentRepository enrollments;
     private final UserServicesInterfaces userServices;
+    private final CouponService couponService;
+    private final NotificationQueue notificationQueue;
     private final SePayProperties sePayProperties;
     private final SePayTransactionClient sePayTransactions;
     private final SePayGatewayClient sePayGateway;
@@ -68,6 +75,8 @@ public class CheckoutService {
             PaymentRepository payments,
             EnrollmentRepository enrollments,
             UserServicesInterfaces userServices,
+            CouponService couponService,
+            NotificationQueue notificationQueue,
             SePayProperties sePayProperties,
             SePayTransactionClient sePayTransactions,
             SePayGatewayClient sePayGateway) {
@@ -78,6 +87,8 @@ public class CheckoutService {
         this.payments = payments;
         this.enrollments = enrollments;
         this.userServices = userServices;
+        this.couponService = couponService;
+        this.notificationQueue = notificationQueue;
         this.sePayProperties = sePayProperties;
         this.sePayTransactions = sePayTransactions;
         this.sePayGateway = sePayGateway;
@@ -132,10 +143,15 @@ public class CheckoutService {
             item.setUnitPrice(row.getUnitPrice() == null ? BigDecimal.ZERO : row.getUnitPrice());
             orderItems.save(item);
         }
+        String couponCode = request == null ? null : request.getCouponCode();
+        if (couponCode != null && !couponCode.isBlank()) {
+            couponService.applyToOrder(order, account.getId(), couponCode, rows);
+            orders.saveAndFlush(order);
+        }
         Payment payment = new Payment();
         payment.setOrder(order);
         payment.setProvider(provider);
-        payment.setAmount(subtotal);
+        payment.setAmount(order.getTotalAmount());
         payment.setCurrency(currency);
         payment.setStatus("PENDING");
         payment.setCheckoutUrl("/thanh-toan/" + order.getOrderCode());
@@ -351,6 +367,31 @@ public class CheckoutService {
             enrollment.setStatus("ACTIVE");
             enrollments.save(enrollment);
         }
+        String title = "Thanh toán thành công";
+        String body = "Đơn " + order.getOrderCode()
+                + " đã được thanh toán. Khóa học đã mở trong mục Học tập.";
+        Long userId = account.getId();
+        Long orderId = order.getId();
+        afterCommit(() -> notificationQueue.enqueue(new NotificationJob(
+                userId,
+                title,
+                body,
+                "PAYMENT",
+                "ORDER",
+                orderId)));
+    }
+
+    private void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private ShopOrder requireOrder(user account, String orderCode) {
@@ -539,7 +580,9 @@ public class CheckoutService {
                 payment.getProvider(),
                 payment.getStatus(),
                 order.getSubtotal(),
+                order.getDiscountAmount(),
                 order.getTotalAmount(),
+                order.getCoupon() == null ? null : order.getCoupon().getCode(),
                 order.getCurrency(),
                 payment.getCheckoutUrl(),
                 bank,

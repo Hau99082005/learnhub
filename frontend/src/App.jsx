@@ -21,9 +21,11 @@ import PurchaseHistoryPage from "@/purchases/page"
 import SettingsPage from "@/settings/page"
 import LearningPage from "@/learning/page"
 import CoursePlayerPage from "@/learn/page"
+import NotificationsPage from "@/notifications/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast, onAuthChange } from "@/lib/auth"
 import { hydrateOwned } from "@/lib/courseAccess"
+import { loadInbox } from "@/lib/inbox"
 import { loadWishlist } from "@/lib/wishlist"
 
 const AdminPage = lazy(() => import("@/admin/page"))
@@ -56,9 +58,11 @@ function App() {
   useEffect(() => {
     hydrateOwned()
     loadWishlist()
+    loadInbox()
     return onAuthChange(() => {
       hydrateOwned()
       loadWishlist()
+      loadInbox()
     })
   }, [])
 
@@ -133,6 +137,8 @@ function App() {
             <PurchaseHistoryPage />
           ) : path === "/cai-dat-tai-khoan" ? (
             <SettingsPage />
+          ) : path === "/thong-bao" ? (
+            <NotificationsPage />
           ) : path === "/gioi-thieu" ? (
             <About />
           ) : path === "/tin-tuc" || path.startsWith("/tin-tuc/") ? (

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ShoppingBag } from "lucide-react";
+import { Check, ShoppingBag, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { formatMoney } from "@/components/Course";
+import { Input } from "@/components/ui/input";
 import { getAuthUser } from "@/lib/auth";
 import { confirmCheckout, createCheckout, getCheckout } from "@/lib/checkout";
 import { addOwnedMany } from "@/lib/courseAccess";
 import { getCart, loadCart } from "@/lib/cart";
+import { previewCoupon } from "@/lib/coupon";
 import { cn } from "@/lib/utils";
 import bankLogo from "@/assets/images/png-clipart-bank-transfer-logo-wire-transfer-electronic-funds-transfer-bank-payment-computer-icons-bank-text-rectangle.png";
 
@@ -140,7 +142,7 @@ function AuthGate() {
   );
 }
 
-function Summary({ items, total, currency }) {
+function Summary({ items, total, currency, subtotal, discount, couponCode }) {
   return (
     <aside className="border border-border p-4 sm:p-5 lg:sticky lg:top-24">
       <p
@@ -205,7 +207,19 @@ function Summary({ items, total, currency }) {
           </li>
         ))}
       </ul>
-      <div className="mt-4 border-t border-border pt-4">
+      <div className="mt-4 border-t border-border pt-4 space-y-2">
+        {Number(discount) > 0 ? (
+          <>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Tạm tính</span>
+              <span>{formatMoney(subtotal ?? total, currency)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-emerald-500">
+              <span>{couponCode ? `Giảm giá (${couponCode})` : "Giảm giá"}</span>
+              <span>-{formatMoney(discount, currency)}</span>
+            </div>
+          </>
+        ) : null}
         <p
           className="text-sm text-muted-foreground"
           style={{
@@ -347,6 +361,11 @@ function CheckoutStart() {
   const [ready, setReady] = useState(false);
   const [provider, setProvider] = useState("BANK_TRANSFER");
   const [submitting, setSubmitting] = useState(false);
+  const [couponInput, setCouponInput] = useState(
+    () => new URLSearchParams(window.location.search).get("coupon") || "",
+  );
+  const [quote, setQuote] = useState(null);
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     loadCart()
@@ -354,12 +373,56 @@ function CheckoutStart() {
       .finally(() => setReady(true));
   }, []);
 
+  useEffect(() => {
+    const preset = couponInput.trim();
+    if (!preset || !ready) {
+      return;
+    }
+    let cancelled = false;
+    previewCoupon(preset)
+      .then((data) => {
+        if (!cancelled) {
+          setQuote(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setQuote(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready]);
+
   const items = Array.isArray(cart.items) ? cart.items : [];
+  const payable = quote ? quote.totalAmount : cart.subtotal;
+  const discount = quote ? quote.discountAmount : 0;
+
+  const applyCode = async () => {
+    const code = couponInput.trim();
+    if (!code) {
+      setQuote(null);
+      return;
+    }
+    setApplying(true);
+    try {
+      const data = await previewCoupon(code);
+      setQuote(data);
+      setCouponInput(data.code || code);
+      toast.success(`Đã áp dụng mã ${data.code}`);
+    } catch (error) {
+      setQuote(null);
+      toast.error(error.message || "Không áp dụng được mã giảm giá");
+    } finally {
+      setApplying(false);
+    }
+  };
 
   const submit = async () => {
     setSubmitting(true);
     try {
-      const order = await createCheckout(provider);
+      const order = await createCheckout(provider, quote?.code || couponInput.trim());
       await loadCart();
       if (isPaid(order)) {
         toast.message("Bạn đã sở hữu khóa học trong đơn này");
@@ -458,6 +521,35 @@ function CheckoutStart() {
           <div className="mt-4">
             <MethodPicker selected={provider} onSelect={setProvider} />
           </div>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <div className="relative min-w-0 flex-1">
+              <Tag className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={couponInput}
+                onChange={(event) => {
+                  setCouponInput(event.target.value.toUpperCase());
+                  setQuote(null);
+                }}
+                placeholder="Mã giảm giá"
+                className="h-11 pl-9"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void applyCode();
+                  }
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={applying}
+              onClick={applyCode}
+              className="inline-flex h-11 items-center justify-center border border-border px-4 text-sm font-medium transition hover:bg-muted disabled:opacity-70"
+              style={{ borderRadius: "5px" }}
+            >
+              {applying ? "Đang áp..." : "Áp dụng"}
+            </button>
+          </div>
           <button
             type="button"
             disabled={submitting}
@@ -489,7 +581,14 @@ function CheckoutStart() {
             Đảm bảo hoàn tiền trong 30 ngày
           </p>
         </div>
-        <Summary items={items} total={cart.subtotal} currency={cart.currency} />
+        <Summary
+          items={items}
+          total={payable}
+          subtotal={cart.subtotal}
+          discount={discount}
+          couponCode={quote?.code}
+          currency={cart.currency}
+        />
       </div>
     </section>
   );
@@ -683,6 +782,9 @@ function CheckoutOrder({ orderCode }) {
         <Summary
           items={order.items || []}
           total={order.totalAmount}
+          subtotal={order.subtotal}
+          discount={order.discountAmount}
+          couponCode={order.couponCode}
           currency={order.currency}
         />
       </div>

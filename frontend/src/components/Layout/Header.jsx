@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Bell,
   ChevronDown,
   Lightbulb,
   LogOut,
@@ -37,6 +38,7 @@ import {
   setPendingToast,
 } from "@/lib/auth";
 import { cartCount, loadCart, onCartChange } from "@/lib/cart";
+import { inboxUnread, loadInboxCount, onInboxChange } from "@/lib/inbox";
 import { loadWishlist, onWishlistChange, wishlistCount } from "@/lib/wishlist";
 import { isAdmin, isInstructor, roleLabel } from "@/lib/roles";
 import { getData as getCategories } from "@/components/Category";
@@ -176,7 +178,7 @@ function UserMenuLink({ href, children, count }) {
   );
 }
 
-function UserMenu({ user, cartItems = 0, wishItems = 0 }) {
+function UserMenu({ user, cartItems = 0, wishItems = 0, unread = 0 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -231,7 +233,9 @@ function UserMenu({ user, cartItems = 0, wishItems = 0 }) {
           <UserMenuLink href="/giang-day/quan-tri">Quản lý khóa học</UserMenuLink>
         ) : null}
         <DropdownMenuSeparator />
-        <UserMenuLink href="/thong-bao">Thông báo</UserMenuLink>
+        <UserMenuLink href="/thong-bao" count={unread}>
+          Thông báo
+        </UserMenuLink>
         <UserMenuLink href="/tin-nhan">Tin nhắn</UserMenuLink>
         <DropdownMenuSeparator />
         <UserMenuLink href="/cai-dat-tai-khoan">Cài đặt tài khoản</UserMenuLink>
@@ -313,6 +317,7 @@ const Header = () => {
   const [user, setUser] = useState(null);
   const [itemsInCart, setItemsInCart] = useState(0);
   const [itemsInWish, setItemsInWish] = useState(0);
+  const [unread, setUnread] = useState(0);
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
@@ -320,14 +325,21 @@ const Header = () => {
     setUser(getAuthUser());
     setItemsInCart(cartCount());
     setItemsInWish(wishlistCount());
+    setUnread(inboxUnread());
     const unsubscribe = onAuthChange((next) => {
       setUser(next);
       loadWishlist().then(() => setItemsInWish(wishlistCount()));
+      loadInboxCount().then(setUnread);
     });
     const stopCart = onCartChange(() => setItemsInCart(cartCount()));
     const stopWish = onWishlistChange(() => setItemsInWish(wishlistCount()));
+    const stopInbox = onInboxChange((state) => setUnread(state.unread || 0));
     loadCart().then(() => setItemsInCart(cartCount()));
     loadWishlist().then(() => setItemsInWish(wishlistCount()));
+    loadInboxCount().then(setUnread);
+    const poll = window.setInterval(() => {
+      loadInboxCount().then(setUnread);
+    }, 20000);
     getCategories()
       .then((data) => setCategories(Array.isArray(data) ? data : []))
       .catch(() => setCategories([]));
@@ -338,6 +350,8 @@ const Header = () => {
       unsubscribe();
       stopCart();
       stopWish();
+      stopInbox();
+      window.clearInterval(poll);
       window.removeEventListener("scroll", onScroll);
     };
   }, []);
@@ -638,7 +652,29 @@ const Header = () => {
           </a>
 
           {user ? (
-            <UserMenu user={user} cartItems={itemsInCart} wishItems={itemsInWish} />
+            <>
+              <a
+                href="/thong-bao"
+                aria-label="Thông báo"
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "icon" }),
+                  "relative",
+                )}
+              >
+                <Bell className="size-5" strokeWidth={1.75} />
+                {unread > 0 ? (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-700 px-1 text-[10px] font-semibold text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                ) : null}
+              </a>
+              <UserMenu
+                user={user}
+                cartItems={itemsInCart}
+                wishItems={itemsInWish}
+                unread={unread}
+              />
+            </>
           ) : (
             <div className="hidden items-center gap-1.5 lg:flex">
               <a

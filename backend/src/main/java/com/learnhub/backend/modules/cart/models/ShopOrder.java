@@ -3,6 +3,7 @@ package com.learnhub.backend.modules.cart.models;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.learnhub.backend.modules.coupon.models.Coupon;
 import com.learnhub.backend.modules.user.models.user;
 
 import jakarta.persistence.Column;
@@ -27,6 +28,10 @@ public class ShopOrder {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private user user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_id")
+    private Coupon coupon;
 
     @Column(name = "order_code", nullable = false, unique = true, length = 40)
     private String orderCode;
@@ -99,6 +104,14 @@ public class ShopOrder {
 
     public void setUser(user user) {
         this.user = user;
+    }
+
+    public Coupon getCoupon() {
+        return coupon;
+    }
+
+    public void setCoupon(Coupon coupon) {
+        this.coupon = coupon;
     }
 
     public String getOrderCode() {

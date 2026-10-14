@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, ShoppingBag } from "lucide-react";
+import { Check, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { formatMoney } from "@/components/Course";
 import { getAuthUser } from "@/lib/auth";
@@ -335,86 +335,23 @@ function PayGuide({ order }) {
       </div>
     );
   }
-  if (order.provider === "BANK_TRANSFER" && order.bankTransfer) {
-    const bank = order.bankTransfer;
-    const copy = (value) => {
-      if (!value) {
-        return;
-      }
-      navigator.clipboard?.writeText(String(value)).then(
-        () => toast.success("Đã sao chép"),
-        () => {},
-      );
-    };
-    return (
-      <div className="border border-border p-4 sm:p-6">
-        <p className="text-sm font-medium" style={fieldStyle}>
-          Quét QR hoặc chuyển khoản đúng nội dung bên dưới
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          SePay chỉ nhận được tiền khi đúng số tài khoản đã liên kết.
-        </p>
-        {bank.qrUrl ? (
-          <div className="mt-4 flex justify-center">
-            <img
-              src={bank.qrUrl}
-              alt=""
-              className="w-full max-w-[16rem] bg-white p-2"
-              style={{ borderRadius: "5px" }}
-            />
-          </div>
-        ) : null}
-        <dl className="mt-4 space-y-2 text-sm">
-          {[
-            ["Ngân hàng", bank.bankName],
-            ["Chủ tài khoản", bank.accountName],
-            ["Số tài khoản", bank.accountNumber],
-            ["Số tiền", formatMoney(order.totalAmount, order.currency)],
-            ["Nội dung CK", bank.transferContent || order.orderCode],
-          ].map(([label, value]) => (
-            <div key={label} className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <dt className="text-muted-foreground">{label}</dt>
-                <dd className="font-medium break-all">{value}</dd>
-              </div>
-              <button
-                type="button"
-                onClick={() => copy(value)}
-                className="mt-1 inline-flex size-8 shrink-0 items-center justify-center border border-border text-muted-foreground hover:text-foreground"
-                style={{ borderRadius: "5px" }}
-                aria-label={`Sao chép ${label}`}
-              >
-                <Copy className="size-3.5" />
-              </button>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-4 text-sm text-violet-700">
-          Sau khi chuyển khoản thành công, trang sẽ tự xác nhận và chuyển sang học tập.
-        </p>
-        {bank.syncMessage ? (
-          <p className="mt-2 text-sm text-amber-500">{bank.syncMessage}</p>
-        ) : null}
-      </div>
-    );
-  }
-  const momo = order.provider === "MOMO";
+  const result = paymentQuery();
+  const title =
+    result === "cancel"
+      ? "Bạn đã hủy thanh toán"
+      : result === "error"
+        ? "Thanh toán chưa thành công"
+        : "Đang chuyển đến SePay";
+  const hint =
+    result === "cancel" || result === "error"
+      ? "Nhấn Thanh toán qua SePay để thử lại."
+      : `Cổng thanh toán SePay sẽ mở để bạn hoàn tất đơn ${order.orderCode}.`;
   return (
-    <div className="flex justify-center border border-border p-4 sm:p-6">
-      <div
-        className={cn(
-          "flex aspect-square w-full max-w-[16rem] flex-col items-center justify-center gap-2 text-white",
-          momo ? "bg-[#D82D8B]" : "bg-[#0055AA]",
-        )}
-        style={{ borderRadius: "5px" }}
-      >
-        <span className="px-3 text-center text-lg font-bold">
-          {order.orderCode}
-        </span>
-        <span className="text-sm font-semibold">
-          {formatMoney(order.totalAmount, order.currency)}
-        </span>
-      </div>
+    <div className="border border-border px-4 py-8 text-center sm:px-6">
+      <p className="text-base font-semibold" style={fieldStyle}>
+        {title}
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
     </div>
   );
 }
@@ -443,8 +380,11 @@ function CheckoutStart() {
         window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
         return;
       }
-      const pay = order?.gateway?.action ? "?pay=1" : "";
-      window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}${pay}`;
+      if (submitSePayGateway(order)) {
+        return;
+      }
+      toast.error("Không mở được cổng thanh toán SePay");
+      setSubmitting(false);
     } catch (error) {
       const message = error.message || "Không thể tạo đơn thanh toán";
       toast.error(message);

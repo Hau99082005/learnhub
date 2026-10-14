@@ -529,8 +529,7 @@ public class CheckoutService {
                     sync);
         }
         SePayGatewayDTO gateway = null;
-        if ("PENDING".equalsIgnoreCase(order.getStatus())
-                && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
+        if ("PENDING".equalsIgnoreCase(order.getStatus())) {
             gateway = sePayGateway.checkoutForm(order);
         }
         return new CheckoutDTO(

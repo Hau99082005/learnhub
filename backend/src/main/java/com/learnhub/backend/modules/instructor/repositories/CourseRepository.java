@@ -17,6 +17,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     List<Course> findByDeletedAtIsNullAndStatusOrderByPublishedAtDesc(String status);
 
+    List<Course> findByDeletedAtIsNullAndStatusAndCategory_SlugOrderByPublishedAtDesc(
+            String status,
+            String slug);
+
     @Query("""
             select distinct c from Course c
             left join c.instructor i

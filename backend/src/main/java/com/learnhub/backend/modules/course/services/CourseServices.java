@@ -77,10 +77,31 @@ public class CourseServices {
 
     @Transactional(readOnly = true)
     public List<CourseAdminDTO> listPublished(String query) {
+        return listPublished(query, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseAdminDTO> listPublished(String query, String categorySlug) {
         String term = query == null ? "" : query.trim();
-        List<Course> rows = term.isBlank()
-                ? courses.findByDeletedAtIsNullAndStatusOrderByPublishedAtDesc("PUBLISHED")
-                : courses.searchPublished("PUBLISHED", term);
+        String slug = categorySlug == null ? "" : categorySlug.trim();
+        List<Course> rows;
+        if (!slug.isBlank()) {
+            rows = courses.findByDeletedAtIsNullAndStatusAndCategory_SlugOrderByPublishedAtDesc("PUBLISHED", slug);
+            if (!term.isBlank()) {
+                String needle = term.toLowerCase();
+                rows = rows.stream()
+                        .filter((item) -> {
+                            String title = item.getTitle() == null ? "" : item.getTitle();
+                            String subtitle = item.getSubtitle() == null ? "" : item.getSubtitle();
+                            return title.toLowerCase().contains(needle) || subtitle.toLowerCase().contains(needle);
+                        })
+                        .toList();
+            }
+        } else if (term.isBlank()) {
+            rows = courses.findByDeletedAtIsNullAndStatusOrderByPublishedAtDesc("PUBLISHED");
+        } else {
+            rows = courses.searchPublished("PUBLISHED", term);
+        }
         return rows.stream().map(this::toAdminDto).toList();
     }
 

@@ -23,8 +23,9 @@ public class CoursePublicController {
 
     @GetMapping
     public ResponseEntity<List<CourseAdminDTO>> list(
-            @RequestParam(value = "q", required = false) String query) {
-        return ResponseEntity.ok(courseServices.listPublished(query));
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "category", required = false) String category) {
+        return ResponseEntity.ok(courseServices.listPublished(query, category));
     }
 
     @GetMapping("/{slug}")

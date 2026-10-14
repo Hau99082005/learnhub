@@ -9,12 +9,14 @@ import {
   Plus,
   Trash2,
   Upload,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import LessonRecorder from "@/components/LessonRecorder";
 import { authDelete, authGet, authPost, authPut } from "@/lib/auth";
 import { uploadCourseVideo } from "@/lib/courseVideo";
 import { cn } from "@/lib/utils";
@@ -83,6 +85,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
   const [progress, setProgress] = useState({});
   const [uploading, setUploading] = useState({});
   const [playingId, setPlayingId] = useState(null);
+  const [recordingLesson, setRecordingLesson] = useState(null);
 
   const courseId = course?.id;
   const path = apiBase || (courseId ? `/api/admin/courses/${courseId}/sections` : "");
@@ -120,6 +123,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
     setProgress({});
     setUploading({});
     setPlayingId(null);
+    setRecordingLesson(null);
     load();
   }, [courseId]);
 
@@ -194,17 +198,15 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
     }
   };
 
-  const onPickLessonFiles = (sectionId, event) => {
-    const picked = Array.from(event.target.files || []);
-    event.target.value = "";
-    const videos = picked.filter(isVideoFile);
-    if (!videos.length) {
+  const queueVideos = (sectionId, videos) => {
+    const incoming = (videos || []).filter(isVideoFile);
+    if (!incoming.length) {
       toast.error("Vui lòng chọn file video");
       return;
     }
     const merged = sortVideoFiles([
       ...(lessonFiles[sectionId] || []),
-      ...videos,
+      ...incoming,
     ]);
     const unique = [];
     const seen = new Set();
@@ -224,6 +226,12 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
         [sectionId]: prev[sectionId] || fileTitle(unique[0]),
       }));
     }
+  };
+
+  const onPickLessonFiles = (sectionId, event) => {
+    const picked = Array.from(event.target.files || []);
+    event.target.value = "";
+    queueVideos(sectionId, picked);
   };
 
   const moveQueuedFile = (sectionId, index, direction) => {
@@ -293,16 +301,11 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
     }
   };
 
-  const replaceLessonVideo = async (section, lesson, event) => {
-    const next = event.target.files?.[0];
-    event.target.value = "";
+  const saveLessonFile = async (section, lesson, next) => {
     if (!next) {
       return;
     }
-    if (
-      !next.type.startsWith("video/") &&
-      !/\.(mp4|webm|mov|mkv|avi)$/i.test(next.name)
-    ) {
+    if (!isVideoFile(next)) {
       toast.error("Vui lòng chọn file video");
       return;
     }
@@ -320,6 +323,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
         bytes: ready.bytes || next.size,
       });
       toast.success("Đã tải và nén video bài giảng");
+      setRecordingLesson(null);
       await load();
     } catch (error) {
       toast.error(error.message);
@@ -327,6 +331,12 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
       setUploading((prev) => ({ ...prev, [key]: false }));
       setProgress((prev) => ({ ...prev, [key]: 0 }));
     }
+  };
+
+  const replaceLessonVideo = async (section, lesson, event) => {
+    const next = event.target.files?.[0];
+    event.target.value = "";
+    await saveLessonFile(section, lesson, next);
   };
 
   const removeLesson = async (section, lesson) => {
@@ -400,7 +410,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
             {course?.title || ""}
             {sections.length
               ? ` · ${sections.length} phần · ${lessonTotal} bài giảng · ${formatLength(durationTotal)}`
-              : " · Thêm phần, rồi tải video vào từng phần (tự sắp xếp)"}
+              : " · Thêm phần, rồi ghi hình hoặc tải video vào từng phần"}
           </p>
         </div>
       </div>
@@ -598,6 +608,23 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
                             </label>
                             <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={saving || uploading[`lesson-${lesson.id}`]}
+                              onClick={() =>
+                                setRecordingLesson((value) =>
+                                  value?.lessonId === lesson.id
+                                    ? null
+                                    : { sectionId: section.id, lessonId: lesson.id },
+                                )
+                              }
+                              style={{ borderRadius: "5px" }}
+                            >
+                              <Video className="size-3.5" />
+                              Ghi hình
+                            </Button>
+                            <Button
+                              type="button"
                               variant="ghost"
                               size="icon"
                               disabled={saving || lessonIndex === 0}
@@ -648,6 +675,14 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
                             className="mt-2 aspect-video w-full max-w-[13rem] bg-black object-contain sm:max-w-[16rem]"
                             style={{ borderRadius: "5px" }}
                           />
+                        ) : null}
+                        {recordingLesson?.lessonId === lesson.id ? (
+                          <div className="mt-2">
+                            <LessonRecorder
+                              disabled={saving || uploading[`lesson-${lesson.id}`]}
+                              onCapture={(file) => saveLessonFile(section, lesson, file)}
+                            />
+                          </div>
                         ) : null}
                       </div>
                     ))}
@@ -706,6 +741,10 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
                             }
                           />
                         </label>
+                        <LessonRecorder
+                          disabled={saving || uploading[section.id]}
+                          onCapture={(file) => queueVideos(section.id, [file])}
+                        />
                         {(lessonFiles[section.id] || []).length > 0 ? (
                           <ul className="grid gap-1">
                             {(lessonFiles[section.id] || []).map((file, index) => (

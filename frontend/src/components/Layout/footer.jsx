@@ -8,6 +8,8 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getAuthUser } from "@/lib/auth";
+import { isAdmin, isInstructor } from "@/lib/roles";
 
 const EXPLORE = [
   { href: "/khoa-hoc", label: "Các khóa học" },
@@ -52,6 +54,9 @@ const FooterLink = ({ href, label }) => (
 
 const Footer = () => {
   const year = new Date().getFullYear();
+  const user = getAuthUser();
+  const teachHref =
+    isInstructor(user) || isAdmin(user) ? "/giang-day/quan-tri" : "/giang-day";
 
   const onSubscribe = (event) => {
     event.preventDefault();
@@ -215,7 +220,11 @@ const Footer = () => {
               }}
             >
               {COMPANY.map((item) => (
-                <FooterLink key={item.href} {...item} />
+                <FooterLink
+                  key={item.href}
+                  href={item.href === "/giang-day" ? teachHref : item.href}
+                  label={item.label}
+                />
               ))}
             </ul>
           </nav>

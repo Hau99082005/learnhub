@@ -230,7 +230,7 @@ function UserMenu({ user, cartItems = 0, wishItems = 0, unread = 0 }) {
         </UserMenuLink>
         {isInstructor(user) ? (
           <>
-            <UserMenuLink href="/giang-day">Giảng dạy trên LearnHub</UserMenuLink>
+            <UserMenuLink href="/giang-day/quan-tri">Giảng dạy trên LearnHub</UserMenuLink>
             <UserMenuLink href="/giang-day/quan-tri">Quản lý khóa học</UserMenuLink>
           </>
         ) : null}
@@ -527,7 +527,7 @@ const Header = () => {
                     <SheetClose
                       render={
                         <a
-                          href="/giang-day"
+                          href="/giang-day/quan-tri"
                           className="flex h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         />
                       }
@@ -618,7 +618,7 @@ const Header = () => {
           ) : null}
           {isInstructor(user) ? (
             <a
-              href="/giang-day"
+              href="/giang-day/quan-tri"
               className="hidden h-10 items-center px-2 text-sm font-medium text-foreground transition-colors hover:text-violet-700 lg:inline-flex"
             >
               Giảng dạy

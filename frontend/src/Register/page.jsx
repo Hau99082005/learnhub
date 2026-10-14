@@ -72,11 +72,9 @@ const Page = () => {
         clearTeachStart();
       }
       setPendingToast("success", "Đăng ký thành công");
-      window.location.href = complete
+      window.location.href = teach || data?.user?.role === ROLES.INSTRUCTOR
         ? INSTRUCTOR_STUDIO
-        : teach
-          ? "/giang-day/bat-dau"
-          : safeNextPath("/");
+        : safeNextPath("/");
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -236,11 +234,9 @@ const Page = () => {
         role={fromTeachFlow() ? ROLES.INSTRUCTOR : values.role}
         extraBody={readTeachStartPayload() || {}}
         redirectTo={
-          readTeachStartAnswers()
+          fromTeachFlow() || values.role === ROLES.INSTRUCTOR || readTeachStartAnswers()
             ? INSTRUCTOR_STUDIO
-            : fromTeachFlow()
-              ? "/giang-day/bat-dau"
-              : safeNextPath("/")
+            : safeNextPath("/")
         }
         onBeforeGoogle={() => (agree ? "" : "Vui lòng đồng ý với điều khoản")}
       />

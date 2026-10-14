@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Moon,
   Play,
+  Video,
   Wrench,
   X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { clearAuth, getAuthUser, setPendingToast } from "@/lib/auth";
 
 const NAV = [
   { href: "/giang-day/quan-tri", label: "Khóa học", icon: Play },
+  { href: "/giang-day/quan-tri/ghi-hinh", label: "Ghi hình", icon: Video },
   { href: "/giang-day/quan-tri/giao-tiep", label: "Giao tiếp", icon: MessageSquare },
   { href: "/giang-day/quan-tri/hieu-suat", label: "Hiệu suất", icon: ChartNoAxesColumn },
   { href: "/giang-day/quan-tri/cong-cu", label: "Công cụ", icon: Wrench },

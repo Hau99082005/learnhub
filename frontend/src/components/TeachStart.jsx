@@ -41,7 +41,6 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const REGISTER_HREF = "/dang-ky?role=INSTRUCTOR&from=teach";
-const EXIT_HREF = "/giang-day";
 
 const questionSteps = (answers) => {
   const teaching = answers["hinh-thuc"] || "";
@@ -372,7 +371,7 @@ const TeachStart = () => {
             Bước {Math.min(step + 1, total)} / {total}
           </p>
           <a
-            href={EXIT_HREF}
+            href="/giang-day"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             style={{ ...bodyStyle, fontSize: "14px" }}
           >

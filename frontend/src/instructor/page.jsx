@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AllCourse } from "@/admin/courses/AllCourse";
+import CourseRecord from "@/instructor/CourseRecord";
 import { getAuthUser } from "@/lib/auth";
 import { isInstructor, isAdmin } from "@/lib/roles";
 import InstructorLayout from "@/instructor/layout";
@@ -36,6 +37,14 @@ const InstructorPage = () => {
     },
   };
   const placeholder = placeholders[section];
+
+  if (section === "/giang-day/quan-tri/ghi-hinh") {
+    return (
+      <InstructorLayout>
+        <CourseRecord />
+      </InstructorLayout>
+    );
+  }
 
   if (placeholder) {
     return (

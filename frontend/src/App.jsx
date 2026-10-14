@@ -24,10 +24,12 @@ import CoursePlayerPage from "@/learn/page"
 import NotificationsPage from "@/notifications/page"
 import PaymentMethodsPage from "@/payments/page"
 import { Toaster } from "@/components/ui/sonner"
-import { consumePendingToast, onAuthChange } from "@/lib/auth"
+import { consumePendingToast, getAuthUser, onAuthChange } from "@/lib/auth"
 import { hydrateOwned } from "@/lib/courseAccess"
 import { loadInbox } from "@/lib/inbox"
 import { loadWishlist } from "@/lib/wishlist"
+import { isAdmin, isInstructor } from "@/lib/roles"
+import { INSTRUCTOR_STUDIO } from "@/lib/teachStart"
 
 const AdminPage = lazy(() => import("@/admin/page"))
 
@@ -35,7 +37,10 @@ function App() {
   const path = window.location.pathname
   const isLogin = path === "/dang-nhap"
   const isRegister = path === "/dang-ky"
+  const user = getAuthUser()
+  const isTeacher = isInstructor(user) || isAdmin(user)
   const isTeachStart = path === "/giang-day/bat-dau"
+  const isInstructorLanding = path === "/giang-day"
   const isInstructorStudio =
     path === "/giang-day/quan-tri" || path.startsWith("/giang-day/quan-tri/")
   const isAdminPage =
@@ -66,6 +71,11 @@ function App() {
       loadInbox()
     })
   }, [])
+
+  if ((isInstructorLanding || isTeachStart) && isTeacher) {
+    window.location.replace(INSTRUCTOR_STUDIO)
+    return null
+  }
 
   if (isTeachStart) {
     return (

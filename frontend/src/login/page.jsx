@@ -63,11 +63,14 @@ const Page = () => {
         }
       }
       setPendingToast("success", "Đăng nhập thành công");
-      window.location.href = complete
-        ? INSTRUCTOR_STUDIO
-        : fromTeachFlow()
-          ? "/giang-day/bat-dau"
-          : safeNextPath("/");
+      const teacher =
+        data?.user?.role === "INSTRUCTOR" || data?.user?.role === "ADMIN";
+      window.location.href =
+        complete || (fromTeachFlow() && teacher)
+          ? INSTRUCTOR_STUDIO
+          : fromTeachFlow()
+            ? "/giang-day/bat-dau"
+            : safeNextPath("/");
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -169,11 +172,9 @@ const Page = () => {
       <SocialAuth
         extraBody={readTeachStartPayload() || {}}
         redirectTo={
-          readTeachStartAnswers()
+          readTeachStartAnswers() || fromTeachFlow()
             ? INSTRUCTOR_STUDIO
-            : fromTeachFlow()
-              ? "/giang-day/bat-dau"
-              : safeNextPath("/")
+            : safeNextPath("/")
         }
       />
     </AuthLayout>

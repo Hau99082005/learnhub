@@ -8,6 +8,7 @@ import {
   Clock,
   Flame,
   FolderPlus,
+  Heart,
   MoreVertical,
   Play,
   Plus,
@@ -18,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
-import { formatDuration, LEVELS } from "@/components/Course";
+import { CourseCard, formatDuration, LEVELS } from "@/components/Course";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,11 +38,16 @@ import {
   getLastAccessMap,
   getLists,
   getStreak,
-  getWishlistIds,
   recordStreakVisit,
   setArchived,
 } from "@/lib/learning";
 import { cn } from "@/lib/utils";
+import {
+  getWishlistItems,
+  loadWishlist,
+  onWishlistChange,
+  toggleWishlist,
+} from "@/lib/wishlist";
 
 const TABS = [
   { id: "all", label: "Tất cả khóa học" },
@@ -233,10 +239,19 @@ const LearningPage = () => {
   const [instructor, setInstructor] = useState("all");
   const [sort, setSort] = useState("recent");
   const [archivedIds, setArchivedIds] = useState(() => getArchivedIds());
-  const [wishlistIds] = useState(() => getWishlistIds());
+  const [wishItems, setWishItems] = useState(() => getWishlistItems());
   const [lists, setLists] = useState(() => getLists());
   const [listName, setListName] = useState("");
   const [streak, setStreak] = useState(() => getStreak());
+
+  useEffect(() => {
+    if (!user) {
+      setWishItems([]);
+      return undefined;
+    }
+    loadWishlist().then(setWishItems);
+    return onWishlistChange(setWishItems);
+  }, [user, tab]);
 
   useEffect(() => {
     if (!user) {
@@ -276,22 +291,47 @@ const LearningPage = () => {
   }, [user, query]);
 
   const categories = useMemo(() => {
+    const source = tab === "wishlist" ? wishItems : items;
     const names = [
-      ...new Set(items.map((item) => item.categoryName).filter(Boolean)),
+      ...new Set(source.map((item) => item.categoryName).filter(Boolean)),
     ];
     return names.sort((a, b) => a.localeCompare(b, "vi"));
-  }, [items]);
+  }, [items, tab, wishItems]);
 
   const instructors = useMemo(() => {
+    const source = tab === "wishlist" ? wishItems : items;
     const names = [
-      ...new Set(items.map((item) => item.instructorName).filter(Boolean)),
+      ...new Set(source.map((item) => item.instructorName).filter(Boolean)),
     ];
     return names.sort((a, b) => a.localeCompare(b, "vi"));
-  }, [items]);
+  }, [items, tab, wishItems]);
+
+  const wishVisible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    let rows = [...wishItems];
+    if (needle) {
+      rows = rows.filter((item) =>
+        [item.title, item.instructorName, item.categoryName]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle)),
+      );
+    }
+    if (category !== "all") {
+      rows = rows.filter((item) => item.categoryName === category);
+    }
+    if (instructor !== "all") {
+      rows = rows.filter((item) => item.instructorName === instructor);
+    }
+    if (sort === "title") {
+      rows = [...rows].sort((a, b) =>
+        String(a.title).localeCompare(String(b.title), "vi"),
+      );
+    }
+    return rows;
+  }, [category, instructor, query, sort, wishItems]);
 
   const visible = useMemo(() => {
     const archived = new Set(archivedIds);
-    const wished = new Set(wishlistIds);
     const access = getLastAccessMap();
     let rows = items.filter((item) => {
       const isArchived = archived.has(Number(item.courseId));
@@ -302,7 +342,7 @@ const LearningPage = () => {
         return false;
       }
       if (tab === "wishlist") {
-        return wished.has(Number(item.courseId));
+        return false;
       }
       if (tab === "certs") {
         return item.issuesCertificate && progressOf(item) >= 100;
@@ -351,7 +391,6 @@ const LearningPage = () => {
     progressFilter,
     sort,
     tab,
-    wishlistIds,
   ]);
 
   const archiveItem = (item, archived) => {
@@ -742,14 +781,14 @@ const LearningPage = () => {
               lineHeight: 1.7,
               letterSpacing: '0.01em'
             }}>
-              {loading && items.length === 0
+              {loading && items.length === 0 && tab !== "wishlist"
                 ? "Đang tải khóa học..."
-                : `${visible.length} khóa học`}
+                : `${(tab === "wishlist" ? wishVisible : visible).length} khóa học`}
             </p>
 
             {error ? (
               <p className="mt-8 text-sm text-destructive">{error}</p>
-            ) : loading && items.length === 0 ? (
+            ) : loading && items.length === 0 && tab !== "wishlist" ? (
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <div
@@ -764,12 +803,14 @@ const LearningPage = () => {
                   </div>
                 ))}
               </div>
-            ) : visible.length === 0 ? (
+            ) : (tab === "wishlist" ? wishVisible : visible).length === 0 ? (
               <div className="mt-10 rounded-2xl border border-dashed border-border px-4 py-12 text-center">
                 {tab === "certs" ? (
                   <Award className="mx-auto size-10 text-muted-foreground" />
                 ) : tab === "archived" ? (
                   <Archive className="mx-auto size-10 text-muted-foreground" />
+                ) : tab === "wishlist" ? (
+                  <Heart className="mx-auto size-10 text-muted-foreground" />
                 ) : (
                   <BookOpen className="mx-auto size-10 text-muted-foreground" />
                 )}
@@ -785,7 +826,9 @@ const LearningPage = () => {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {tab === "all"
                     ? "Mua khóa học để bắt đầu lộ trình học tập."
-                    : "Hãy khám phá thêm khóa học trên LearnHub."}
+                    : tab === "wishlist"
+                      ? "Nhấn biểu tượng trái tim trên khóa học để lưu vào đây."
+                      : "Hãy khám phá thêm khóa học trên LearnHub."}
                 </p>
                 <a
                   href="/khoa-hoc"
@@ -796,6 +839,17 @@ const LearningPage = () => {
                 >
                   Khám phá khóa học
                 </a>
+              </div>
+            ) : tab === "wishlist" ? (
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {wishVisible.map((item) => (
+                  <CourseCard
+                    key={item.id}
+                    item={item}
+                    wished
+                    onWish={toggleWishlist}
+                  />
+                ))}
               </div>
             ) : (
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -37,6 +37,7 @@ import {
   setPendingToast,
 } from "@/lib/auth";
 import { cartCount, loadCart, onCartChange } from "@/lib/cart";
+import { loadWishlist, onWishlistChange, wishlistCount } from "@/lib/wishlist";
 import { isAdmin, isInstructor, roleLabel } from "@/lib/roles";
 import { getData as getCategories } from "@/components/Category";
 
@@ -175,7 +176,7 @@ function UserMenuLink({ href, children, count }) {
   );
 }
 
-function UserMenu({ user, cartItems = 0 }) {
+function UserMenu({ user, cartItems = 0, wishItems = 0 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -222,7 +223,7 @@ function UserMenu({ user, cartItems = 0 }) {
         <UserMenuLink href="/gio-hang" count={cartItems}>
           Giỏ hàng của tôi
         </UserMenuLink>
-        <UserMenuLink href="/danh-sach-mong-uoc">
+        <UserMenuLink href="/danh-sach-mong-uoc" count={wishItems}>
           Danh sách mong ước
         </UserMenuLink>
         <UserMenuLink href="/giang-day">Giảng dạy trên LearnHub</UserMenuLink>
@@ -311,15 +312,22 @@ const Header = () => {
   const [path, setPath] = useState("/");
   const [user, setUser] = useState(null);
   const [itemsInCart, setItemsInCart] = useState(0);
+  const [itemsInWish, setItemsInWish] = useState(0);
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     setPath(window.location.pathname);
     setUser(getAuthUser());
     setItemsInCart(cartCount());
-    const unsubscribe = onAuthChange(setUser);
+    setItemsInWish(wishlistCount());
+    const unsubscribe = onAuthChange((next) => {
+      setUser(next);
+      loadWishlist().then(() => setItemsInWish(wishlistCount()));
+    });
     const stopCart = onCartChange(() => setItemsInCart(cartCount()));
+    const stopWish = onWishlistChange(() => setItemsInWish(wishlistCount()));
     loadCart().then(() => setItemsInCart(cartCount()));
+    loadWishlist().then(() => setItemsInWish(wishlistCount()));
     getCategories()
       .then((data) => setCategories(Array.isArray(data) ? data : []))
       .catch(() => setCategories([]));
@@ -329,6 +337,7 @@ const Header = () => {
     return () => {
       unsubscribe();
       stopCart();
+      stopWish();
       window.removeEventListener("scroll", onScroll);
     };
   }, []);
@@ -629,7 +638,7 @@ const Header = () => {
           </a>
 
           {user ? (
-            <UserMenu user={user} cartItems={itemsInCart} />
+            <UserMenu user={user} cartItems={itemsInCart} wishItems={itemsInWish} />
           ) : (
             <div className="hidden items-center gap-1.5 lg:flex">
               <a

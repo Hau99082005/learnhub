@@ -104,11 +104,14 @@ export async function authDelete(path) {
       Authorization: token ? `Bearer ${token}` : "",
     },
   })
-  if (response.status === 204 || response.ok) {
+  const data = await response.json().catch(() => ({}))
+  if (response.status === 204) {
     return true
   }
-  const data = await response.json().catch(() => ({}))
-  throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+  if (!response.ok) {
+    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+  }
+  return data
 }
 
 export async function authForm(path, formData, method = "POST") {

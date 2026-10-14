@@ -18,6 +18,12 @@ import { cn } from "@/lib/utils";
 import { addCourseToCart, isInCart, onCartChange } from "@/lib/cart";
 import { isOwned, onOwnedChange } from "@/lib/courseAccess";
 import { onAuthChange } from "@/lib/auth";
+import {
+  getWishlistIds,
+  loadWishlist,
+  onWishlistChange,
+  toggleWishlist,
+} from "@/lib/wishlist";
 
 let coursesPromise;
 
@@ -100,52 +106,65 @@ function CourseCard({ item, wished, onWish }) {
 
   return (
     <article className="group flex h-full w-full min-w-0 flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-[0_8px_24px_-18px_rgba(15,23,42,0.45)] transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_22px_40px_-24px_rgba(91,33,182,0.45)] dark:hover:border-violet-500/40">
-      <a
-        href={href}
-        className="relative block aspect-[16/9] overflow-hidden bg-muted"
-      >
-        {item.images ? (
-          <img
-            src={item.images}
-            alt={item.title}
-            className="size-full object-cover transition duration-700 group-hover:scale-110"
-          />
-        ) : (
-          <div className="flex size-full items-center justify-center bg-gradient-to-br from-violet-700 via-indigo-700 to-slate-900 text-white/80">
-            <Play className="size-10" />
+      <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+        <a href={href} className="block size-full">
+          {item.images ? (
+            <img
+              src={item.images}
+              alt={item.title}
+              className="size-full object-cover transition duration-700 group-hover:scale-110"
+            />
+          ) : (
+            <div className="flex size-full items-center justify-center bg-gradient-to-br from-violet-700 via-indigo-700 to-slate-900 text-white/80">
+              <Play className="size-10" />
+            </div>
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent opacity-80 transition duration-300 group-hover:opacity-100" />
+          <div className="pointer-events-none absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+            {bestseller ? (
+              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-slate-950 shadow-sm">
+                Bán chạy nhất
+              </span>
+            ) : null}
+            <span
+              className="rounded-none bg-white/95 px-2 py-1 text-[11px] font-semibold text-slate-900 shadow-sm backdrop-blur-sm"
+              style={{
+                border: "none",
+                borderRadius: "5px",
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: "12px",
+                fontWeight: "500",
+                fontStyle: "normal",
+                lineHeight: 1.2,
+                letterSpacing: "0.01em",
+              }}
+            >
+              {level}
+            </span>
           </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent opacity-80 transition duration-300 group-hover:opacity-100" />
-        <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
-          {bestseller ? (
-            <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-slate-950 shadow-sm">
-              Bán chạy nhất
+          {item.previewVideo ? (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
+              <span className="flex size-12 items-center justify-center rounded-full bg-white/95 text-violet-700 shadow-lg">
+                <Play className="size-5 fill-current" />
+              </span>
             </span>
           ) : null}
-          <span
-            className="rounded-none bg-white/95 px-2 py-1 text-[11px] font-semibold text-slate-900 shadow-sm backdrop-blur-sm"
-            style={{
-              border: "none",
-              borderRadius: "5px",
-              fontFamily: "'Roboto', sans-serif",
-              fontSize: "12px",
-              fontWeight: "500",
-              fontStyle: "normal",
-              lineHeight: 1.2,
-              letterSpacing: "0.01em",
-            }}
-          >
-            {level}
-          </span>
-        </div>
+        </a>
         <button
           type="button"
           aria-label={wished ? "Bỏ yêu thích" : "Yêu thích"}
-          className="absolute top-2.5 right-2.5 flex size-8 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-sm backdrop-blur-sm transition hover:scale-110 hover:text-rose-500"
+          className="pointer-events-auto absolute top-2.5 right-2.5 z-30 flex size-8 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-sm backdrop-blur-sm transition hover:scale-110 hover:text-rose-500"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+          onMouseDown={(event) => {
+            event.stopPropagation();
+          }}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            onWish(item.id);
+            const action = onWish || toggleWishlist;
+            void action(item.id);
           }}
         >
           <Heart
@@ -155,14 +174,7 @@ function CourseCard({ item, wished, onWish }) {
             )}
           />
         </button>
-        {item.previewVideo ? (
-          <span className="absolute inset-0 flex items-center justify-center opacity-0 transition duration-300 group-hover:opacity-100">
-            <span className="flex size-12 items-center justify-center rounded-full bg-white/95 text-violet-700 shadow-lg">
-              <Play className="size-5 fill-current" />
-            </span>
-          </span>
-        ) : null}
-      </a>
+      </div>
       <div className="flex flex-1 flex-col gap-2.5 p-3.5 sm:p-4">
         <a href={href} className="block">
           <h3
@@ -365,23 +377,20 @@ function CourseControls({ count }) {
 
 function CourseView() {
   const items = use(getData());
-  const [wished, setWished] = useState(() => new Set());
+  const [wished, setWished] = useState(() => new Set(getWishlistIds()));
+
+  useEffect(() => {
+    loadWishlist().then((rows) =>
+      setWished(new Set(rows.map((row) => Number(row.id)))),
+    );
+    return onWishlistChange((rows) =>
+      setWished(new Set((rows || []).map((row) => Number(row.id)))),
+    );
+  }, []);
 
   if (!items.length) {
     return null;
   }
-
-  const toggleWish = (id) => {
-    setWished((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
 
   return (
     <section className="relative w-full">
@@ -445,7 +454,22 @@ function CourseView() {
           </a>
         </div>
         <Carousel
-          opts={{ align: "start", dragFree: true, containScroll: "trimSnaps" }}
+          opts={{
+            align: "start",
+            dragFree: true,
+            containScroll: "trimSnaps",
+            watchDrag: (_api, event) => {
+              const target = event?.target;
+              if (
+                target &&
+                typeof target.closest === "function" &&
+                target.closest("button")
+              ) {
+                return false;
+              }
+              return true;
+            },
+          }}
           className="w-full"
         >
           <div className="relative">
@@ -459,8 +483,8 @@ function CourseView() {
                   <div className="h-full animate-in fade-in slide-in-from-bottom-3 duration-500">
                     <CourseCard
                       item={item}
-                      wished={wished.has(item.id)}
-                      onWish={toggleWish}
+                      wished={wished.has(Number(item.id))}
+                      onWish={toggleWishlist}
                     />
                   </div>
                 </CarouselItem>
@@ -503,7 +527,16 @@ function CourseGridView() {
   const query = new URLSearchParams(window.location.search).get("q")?.trim() || "";
   const [items, setItems] = useState([]);
   const [ready, setReady] = useState(false);
-  const [wished, setWished] = useState(() => new Set());
+  const [wished, setWished] = useState(() => new Set(getWishlistIds()));
+
+  useEffect(() => {
+    loadWishlist().then((rows) =>
+      setWished(new Set(rows.map((row) => Number(row.id)))),
+    );
+    return onWishlistChange((rows) =>
+      setWished(new Set((rows || []).map((row) => Number(row.id)))),
+    );
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -529,18 +562,6 @@ function CourseGridView() {
   }, [query]);
 
   const visible = items;
-
-  const toggleWish = (id) => {
-    setWished((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
 
   return (
     <section className="w-full">
@@ -580,8 +601,8 @@ function CourseGridView() {
               <CourseCard
                 key={item.id}
                 item={item}
-                wished={wished.has(item.id)}
-                onWish={toggleWish}
+                wished={wished.has(Number(item.id))}
+                onWish={toggleWishlist}
               />
             ))}
           </div>

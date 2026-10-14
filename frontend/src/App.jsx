@@ -24,6 +24,7 @@ import CoursePlayerPage from "@/learn/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast, onAuthChange } from "@/lib/auth"
 import { hydrateOwned } from "@/lib/courseAccess"
+import { loadWishlist } from "@/lib/wishlist"
 
 const AdminPage = lazy(() => import("@/admin/page"))
 
@@ -54,8 +55,10 @@ function App() {
 
   useEffect(() => {
     hydrateOwned()
+    loadWishlist()
     return onAuthChange(() => {
       hydrateOwned()
+      loadWishlist()
     })
   }, [])
 

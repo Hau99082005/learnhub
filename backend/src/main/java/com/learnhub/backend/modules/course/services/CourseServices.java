@@ -4,7 +4,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -79,6 +82,24 @@ public class CourseServices {
                 ? courses.findByDeletedAtIsNullAndStatusOrderByPublishedAtDesc("PUBLISHED")
                 : courses.searchPublished("PUBLISHED", term);
         return rows.stream().map(this::toAdminDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseAdminDTO> findPublishedByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Course> byId = courses.findAllById(ids).stream()
+                .filter((item) -> item.getDeletedAt() == null && "PUBLISHED".equalsIgnoreCase(item.getStatus()))
+                .collect(Collectors.toMap(Course::getId, Function.identity(), (left, right) -> left));
+        List<CourseAdminDTO> rows = new ArrayList<>();
+        for (Long id : ids) {
+            Course item = byId.get(id);
+            if (item != null) {
+                rows.add(toAdminDto(item));
+            }
+        }
+        return rows;
     }
 
     @Transactional(readOnly = true)

@@ -33,6 +33,12 @@ import {
 } from "@/lib/courseAccess";
 import { addCourseToCart, loadCart, onCartChange } from "@/lib/cart";
 import { getAuthUser, onAuthChange } from "@/lib/auth";
+import {
+  isWished,
+  loadWishlist,
+  onWishlistChange,
+  toggleWishlist,
+} from "@/lib/wishlist";
 import { markAccessed } from "@/lib/learning";
 
 const LANG = { vi: "Tiếng Việt", en: "English" };
@@ -611,7 +617,7 @@ function CourseDetailView({ slug }) {
   const detail = use(getCourse(slug));
   const item = detail || items.find((entry) => entry.slug === slug);
   const [expanded, setExpanded] = useState(false);
-  const [wished, setWished] = useState(false);
+  const [wished, setWished] = useState(() => isWished(item?.id));
   const [accessKey, setAccessKey] = useState(0);
   const unlocked = canAccessCourse(item?.id);
   void accessKey;
@@ -628,6 +634,12 @@ function CourseDetailView({ slug }) {
       stopAuth();
     };
   }, []);
+
+  useEffect(() => {
+    const sync = () => setWished(isWished(item?.id));
+    loadWishlist().then(sync);
+    return onWishlistChange(sync);
+  }, [item?.id]);
 
   useEffect(() => {
     if (item?.id && isOwned(item.id)) {
@@ -853,7 +865,7 @@ function CourseDetailView({ slug }) {
           <button
             type="button"
             className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 border border-border text-sm transition hover:bg-muted"
-            onClick={() => setWished((value) => !value)}
+            onClick={() => toggleWishlist(item.id)}
             style={{
               fontSize: "16px",
               fontWeight: "400",

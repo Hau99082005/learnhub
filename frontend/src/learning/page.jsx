@@ -21,7 +21,7 @@ import {
 import { toast } from "sonner";
 import { CertificateCard, CertificateTrackCard } from "@/certificate/CertificateView";
 import { CourseCard, formatDuration, LEVELS } from "@/components/Course";
-import { CERT_PASS, CERT_SCALE } from "@/lib/certificate";
+import { CERT_PASS, CERT_SCALE, gradeOf } from "@/lib/certificate";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -75,6 +75,35 @@ function progressOf(item) {
   }
   return Math.min(100, Math.max(0, value));
 }
+
+function sameText(left, right) {
+  return String(left || "").trim() === String(right || "").trim();
+}
+
+function matchesQuery(item, needle) {
+  if (!needle) {
+    return true;
+  }
+  return [item.title, item.courseTitle, item.instructorName, item.categoryName]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(needle));
+}
+
+const PROGRESS_OPTIONS = [
+  { value: "all", label: "Mọi tiến độ" },
+  { value: "not-started", label: "Chưa bắt đầu" },
+  { value: "in-progress", label: "Đang học" },
+  { value: "done", label: "Đã hoàn thành" },
+];
+
+const CERT_FILTER_OPTIONS = [
+  { value: "all", label: "Mọi xếp loại" },
+  { value: "KHONG_DAT", label: "Chưa đạt" },
+  { value: "TRUNG_BINH", label: "Trung bình" },
+  { value: "KHA", label: "Khá" },
+  { value: "GIOI", label: "Giỏi" },
+  { value: "XUAT_SAC", label: "Xuất sắc" },
+];
 
 function progressLabel(value) {
   if (value <= 0) {
@@ -301,75 +330,91 @@ const LearningPage = () => {
     };
   }, [user, query]);
 
+  const tabPool = useMemo(() => {
+    if (tab === "wishlist") {
+      return wishItems;
+    }
+    const archived = new Set(archivedIds);
+    return items.filter((item) => {
+      const isArchived = archived.has(Number(item.courseId));
+      if (tab === "archived") {
+        return isArchived;
+      }
+      if (isArchived || tab === "lists" || tab === "tools") {
+        return false;
+      }
+      return true;
+    });
+  }, [archivedIds, items, tab, wishItems]);
+
   const categories = useMemo(() => {
-    const source = tab === "wishlist" ? wishItems : items;
     const names = [
-      ...new Set(source.map((item) => item.categoryName).filter(Boolean)),
+      ...new Set(tabPool.map((item) => String(item.categoryName || "").trim()).filter(Boolean)),
     ];
     return names.sort((a, b) => a.localeCompare(b, "vi"));
-  }, [items, tab, wishItems]);
+  }, [tabPool]);
 
   const instructors = useMemo(() => {
-    const source = tab === "wishlist" ? wishItems : items;
     const names = [
-      ...new Set(source.map((item) => item.instructorName).filter(Boolean)),
+      ...new Set(tabPool.map((item) => String(item.instructorName || "").trim()).filter(Boolean)),
     ];
     return names.sort((a, b) => a.localeCompare(b, "vi"));
-  }, [items, tab, wishItems]);
+  }, [tabPool]);
 
-  const wishVisible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    let rows = [...wishItems];
-    if (needle) {
-      rows = rows.filter((item) =>
-        [item.title, item.instructorName, item.categoryName]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(needle)),
-      );
+  useEffect(() => {
+    if (category !== "all" && !categories.some((name) => sameText(name, category))) {
+      setCategory("all");
     }
+  }, [categories, category]);
+
+  useEffect(() => {
+    if (instructor !== "all" && !instructors.some((name) => sameText(name, instructor))) {
+      setInstructor("all");
+    }
+  }, [instructors, instructor]);
+
+  useEffect(() => {
+    const allowed = (tab === "certs" ? CERT_FILTER_OPTIONS : PROGRESS_OPTIONS).map(
+      (option) => option.value,
+    );
+    if (!allowed.includes(progressFilter)) {
+      setProgressFilter("all");
+    }
+  }, [progressFilter, tab]);
+
+  const applySharedFilters = (rows) => {
+    const needle = query.trim().toLowerCase();
+    let next = rows.filter((item) => matchesQuery(item, needle));
     if (category !== "all") {
-      rows = rows.filter((item) => item.categoryName === category);
+      next = next.filter((item) => sameText(item.categoryName, category));
     }
     if (instructor !== "all") {
-      rows = rows.filter((item) => item.instructorName === instructor);
+      next = next.filter((item) => sameText(item.instructorName, instructor));
     }
+    return next;
+  };
+
+  const wishVisible = useMemo(() => {
+    let rows = applySharedFilters(tab === "wishlist" ? tabPool : wishItems);
     if (sort === "title") {
       rows = [...rows].sort((a, b) =>
         String(a.title).localeCompare(String(b.title), "vi"),
       );
     }
     return rows;
-  }, [category, instructor, query, sort, wishItems]);
+  }, [category, instructor, query, sort, tab, tabPool, wishItems]);
 
   const visible = useMemo(() => {
-    const archived = new Set(archivedIds);
     const access = getLastAccessMap();
-    let rows = items.filter((item) => {
-      const isArchived = archived.has(Number(item.courseId));
-      if (tab === "archived") {
-        return isArchived;
+    let rows = applySharedFilters(tabPool);
+    if (tab === "certs") {
+      if (progressFilter !== "all") {
+        rows = rows.filter((item) => {
+          const grade = item.grade || gradeOf(progressOf(item));
+          return grade === progressFilter;
+        });
       }
-      if (isArchived) {
-        return false;
-      }
-      if (tab === "wishlist") {
-        return false;
-      }
-      if (tab === "certs") {
-        return true;
-      }
-      if (tab === "lists" || tab === "tools") {
-        return false;
-      }
-      return true;
-    });
-    if (category !== "all") {
-      rows = rows.filter((item) => item.categoryName === category);
-    }
-    if (instructor !== "all") {
-      rows = rows.filter((item) => item.instructorName === instructor);
-    }
-    if (tab !== "certs") {
+    } else if (tab !== "wishlist") {
       if (progressFilter === "not-started") {
         rows = rows.filter((item) => progressOf(item) <= 0);
       } else if (progressFilter === "in-progress") {
@@ -383,7 +428,10 @@ const LearningPage = () => {
     }
     rows = [...rows].sort((a, b) => {
       if (sort === "title") {
-        return String(a.title).localeCompare(String(b.title), "vi");
+        return String(a.title || a.courseTitle).localeCompare(
+          String(b.title || b.courseTitle),
+          "vi",
+        );
       }
       if (sort === "enrolled") {
         return String(b.enrolledAt || "").localeCompare(String(a.enrolledAt || ""));
@@ -397,13 +445,13 @@ const LearningPage = () => {
     });
     return rows;
   }, [
-    archivedIds,
     category,
     instructor,
-    items,
     progressFilter,
+    query,
     sort,
     tab,
+    tabPool,
   ]);
 
   const archiveItem = (item, archived) => {
@@ -503,7 +551,16 @@ const LearningPage = () => {
                     "relative shrink-0 px-3 py-3 text-sm font-medium transition-colors",
                     active ? "text-white" : "text-white/60 hover:text-white",
                   )}
-                  onClick={() => setTab(entry.id)}
+                  onClick={() => {
+                    setTab(entry.id);
+                    const url = new URL(window.location.href);
+                    if (entry.id === "all") {
+                      url.searchParams.delete("tab");
+                    } else {
+                      url.searchParams.set("tab", entry.id);
+                    }
+                    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+                  }}
                 >
                   {entry.label}
                   <span
@@ -738,17 +795,14 @@ const LearningPage = () => {
                     ...categories.map((name) => ({ value: name, label: name })),
                   ]}
                 />
-                <FilterSelect
-                  label="Tiến độ"
-                  value={progressFilter}
-                  onChange={setProgressFilter}
-                  options={[
-                    { value: "all", label: "Mọi tiến độ" },
-                    { value: "not-started", label: "Chưa bắt đầu" },
-                    { value: "in-progress", label: "Đang học" },
-                    { value: "done", label: "Đã hoàn thành" },
-                  ]}
-                />
+                {tab === "wishlist" ? null : (
+                  <FilterSelect
+                    label={tab === "certs" ? "Xếp loại" : "Tiến độ"}
+                    value={progressFilter}
+                    onChange={setProgressFilter}
+                    options={tab === "certs" ? CERT_FILTER_OPTIONS : PROGRESS_OPTIONS}
+                  />
+                )}
                 <FilterSelect
                   label="Giảng viên"
                   value={instructor}

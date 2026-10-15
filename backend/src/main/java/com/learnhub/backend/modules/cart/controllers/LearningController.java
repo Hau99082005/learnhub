@@ -3,8 +3,10 @@ package com.learnhub.backend.modules.cart.controllers;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.learnhub.backend.modules.cart.dtos.CertificateDTO;
+import com.learnhub.backend.modules.cart.dtos.CourseNoteDTO;
+import com.learnhub.backend.modules.cart.dtos.CourseNoteRequest;
 import com.learnhub.backend.modules.cart.dtos.CoursePlayerDTO;
 import com.learnhub.backend.modules.cart.dtos.LearningItemDTO;
 import com.learnhub.backend.modules.cart.dtos.LearningProgressRequest;
@@ -50,6 +54,39 @@ public class LearningController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable String slug) {
         return ResponseEntity.ok(learningService.player(authorization, slug));
+    }
+
+    @GetMapping("/courses/{slug}/notes")
+    public ResponseEntity<List<CourseNoteDTO>> notes(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable String slug) {
+        return ResponseEntity.ok(learningService.listNotes(authorization, slug));
+    }
+
+    @PostMapping("/courses/{slug}/notes")
+    public ResponseEntity<CourseNoteDTO> createNote(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable String slug,
+            @RequestBody CourseNoteRequest request) {
+        return ResponseEntity.ok(learningService.createNote(authorization, slug, request));
+    }
+
+    @PutMapping("/courses/{slug}/notes/{id}")
+    public ResponseEntity<CourseNoteDTO> updateNote(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable String slug,
+            @PathVariable Long id,
+            @RequestBody CourseNoteRequest request) {
+        return ResponseEntity.ok(learningService.updateNote(authorization, slug, id, request));
+    }
+
+    @DeleteMapping("/courses/{slug}/notes/{id}")
+    public ResponseEntity<Void> deleteNote(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable String slug,
+            @PathVariable Long id) {
+        learningService.deleteNote(authorization, slug, id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/courses/{slug}/progress")

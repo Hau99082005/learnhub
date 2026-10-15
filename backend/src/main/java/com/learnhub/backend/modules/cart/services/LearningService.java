@@ -18,12 +18,16 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.learnhub.backend.modules.cart.dtos.CertificateDTO;
+import com.learnhub.backend.modules.cart.dtos.CourseNoteDTO;
+import com.learnhub.backend.modules.cart.dtos.CourseNoteRequest;
 import com.learnhub.backend.modules.cart.dtos.CoursePlayerDTO;
 import com.learnhub.backend.modules.cart.dtos.LearningItemDTO;
 import com.learnhub.backend.modules.cart.dtos.LearningProgressRequest;
 import com.learnhub.backend.modules.cart.models.Certificate;
+import com.learnhub.backend.modules.cart.models.CourseNote;
 import com.learnhub.backend.modules.cart.models.Enrollment;
 import com.learnhub.backend.modules.cart.repositories.CertificateRepository;
+import com.learnhub.backend.modules.cart.repositories.CourseNoteRepository;
 import com.learnhub.backend.modules.cart.repositories.EnrollmentRepository;
 import com.learnhub.backend.modules.cart.support.CertificateGrades;
 import com.learnhub.backend.modules.category.models.Category;
@@ -44,6 +48,7 @@ public class LearningService {
     private final CourseCurriculumService curriculum;
     private final UserServicesInterfaces userServices;
     private final NotificationQueue notificationQueue;
+    private final CourseNoteRepository notes;
 
     public LearningService(
             EnrollmentRepository enrollments,
@@ -51,13 +56,15 @@ public class LearningService {
             CourseRepository courses,
             CourseCurriculumService curriculum,
             UserServicesInterfaces userServices,
-            NotificationQueue notificationQueue) {
+            NotificationQueue notificationQueue,
+            CourseNoteRepository notes) {
         this.enrollments = enrollments;
         this.certificates = certificates;
         this.courses = courses;
         this.curriculum = curriculum;
         this.userServices = userServices;
         this.notificationQueue = notificationQueue;
+        this.notes = notes;
     }
 
     @Transactional
@@ -393,5 +400,97 @@ public class LearningService {
 
     private boolean filled(String value) {
         return value != null && !value.isBlank();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseNoteDTO> listNotes(String authorization, String slug) {
+        OwnedCourse owned = requireOwned(authorization, slug);
+        return notes.findByUserIdAndCourseIdOrderByCreatedAtDesc(owned.account().getId(), owned.course().getId())
+                .stream()
+                .map(this::toNoteDto)
+                .toList();
+    }
+
+    @Transactional
+    public CourseNoteDTO createNote(String authorization, String slug, CourseNoteRequest request) {
+        OwnedCourse owned = requireOwned(authorization, slug);
+        String body = request == null || request.getBody() == null ? "" : request.getBody().trim();
+        if (body.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Nội dung ghi chú không được để trống");
+        }
+        Long lessonId = request.getLessonId();
+        if (lessonId == null) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Thiếu bài giảng của ghi chú");
+        }
+        CourseNote row = new CourseNote();
+        row.setUserId(owned.account().getId());
+        row.setCourseId(owned.course().getId());
+        row.setLessonId(lessonId);
+        row.setBody(body);
+        row.setTimestampSeconds(normalizeStamp(request.getTimestampSeconds()));
+        return toNoteDto(notes.save(row));
+    }
+
+    @Transactional
+    public CourseNoteDTO updateNote(String authorization, String slug, Long id, CourseNoteRequest request) {
+        OwnedCourse owned = requireOwned(authorization, slug);
+        CourseNote row = notes.findByIdAndUserId(id, owned.account().getId())
+                .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy ghi chú"));
+        if (!row.getCourseId().equals(owned.course().getId())) {
+            throw new AuthException(HttpStatus.FORBIDDEN, "Ghi chú không thuộc khóa học này");
+        }
+        String body = request == null || request.getBody() == null ? row.getBody() : request.getBody().trim();
+        if (body.isBlank()) {
+            throw new AuthException(HttpStatus.BAD_REQUEST, "Nội dung ghi chú không được để trống");
+        }
+        row.setBody(body);
+        if (request != null && request.getTimestampSeconds() != null) {
+            row.setTimestampSeconds(normalizeStamp(request.getTimestampSeconds()));
+        }
+        if (request != null && request.getLessonId() != null) {
+            row.setLessonId(request.getLessonId());
+        }
+        return toNoteDto(notes.save(row));
+    }
+
+    @Transactional
+    public void deleteNote(String authorization, String slug, Long id) {
+        OwnedCourse owned = requireOwned(authorization, slug);
+        CourseNote row = notes.findByIdAndUserId(id, owned.account().getId())
+                .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy ghi chú"));
+        if (!row.getCourseId().equals(owned.course().getId())) {
+            throw new AuthException(HttpStatus.FORBIDDEN, "Ghi chú không thuộc khóa học này");
+        }
+        notes.delete(row);
+    }
+
+    private OwnedCourse requireOwned(String authorization, String slug) {
+        user account = userServices.requireAccount(authorization);
+        Course course = courses.findBySlugAndDeletedAtIsNull(slug)
+                .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy khóa học"));
+        enrollments.findByUserIdAndCourseId(account.getId(), course.getId())
+                .orElseThrow(() -> new AuthException(HttpStatus.FORBIDDEN, "Bạn chưa sở hữu khóa học này"));
+        return new OwnedCourse(account, course);
+    }
+
+    private CourseNoteDTO toNoteDto(CourseNote row) {
+        return new CourseNoteDTO(
+                row.getId(),
+                row.getCourseId(),
+                row.getLessonId(),
+                row.getBody(),
+                row.getTimestampSeconds(),
+                row.getCreatedAt(),
+                row.getUpdatedAt());
+    }
+
+    private Integer normalizeStamp(Integer value) {
+        if (value == null || value < 0) {
+            return null;
+        }
+        return value;
+    }
+
+    private record OwnedCourse(user account, Course course) {
     }
 }

@@ -25,15 +25,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
+import CourseNotes from "@/learn/CourseNotes";
 import { authGet, authPut, getAuthUser } from "@/lib/auth";
 import { addOwned } from "@/lib/courseAccess";
 import {
-  getLessonNote,
   getPlayerProgress,
   markAccessed,
   mergeWatchRange,
   recordStreakVisit,
-  saveLessonNote,
   savePlayerProgress,
   watchCoveragePercent,
 } from "@/lib/learning";
@@ -120,7 +119,6 @@ const CoursePlayerPage = ({ slug }) => {
   );
   const [openSections, setOpenSections] = useState([]);
   const [tab, setTab] = useState("overview");
-  const [note, setNote] = useState("");
   const [showRate, setShowRate] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [watched, setWatched] = useState({});
@@ -129,6 +127,7 @@ const CoursePlayerPage = ({ slug }) => {
   const [unread, setUnread] = useState(() => inboxUnread());
   const [inboxItems, setInboxItems] = useState(() => getInboxItems());
   const inboxRef = useRef(null);
+  const pendingSeekRef = useRef(null);
 
   completedRef.current = completed;
 
@@ -231,6 +230,26 @@ const CoursePlayerPage = ({ slug }) => {
     [lessons, persist, slug],
   );
 
+  const getCurrentTime = useCallback(() => videoRef.current?.currentTime || 0, []);
+
+  const jumpToNote = useCallback(
+    (item) => {
+      const stamp = Number(item?.timestampSeconds);
+      const hasStamp = Number.isFinite(stamp);
+      if (item?.lessonId && item.lessonId !== currentIdRef.current) {
+        pendingSeekRef.current = hasStamp ? stamp : 0;
+        selectLesson(item.lessonId);
+        return;
+      }
+      if (hasStamp && videoRef.current) {
+        armSeek();
+        videoRef.current.currentTime = stamp;
+        paintTime(stamp);
+      }
+    },
+    [armSeek, selectLesson],
+  );
+
   useEffect(() => {
     if (!userId) {
       window.location.href = loginHref(slug);
@@ -268,7 +287,6 @@ const CoursePlayerPage = ({ slug }) => {
             ? [startSection]
             : (data.sections || []).slice(0, 1).map((item) => item.id),
         );
-        setNote(getLessonNote(data.courseId, start));
       })
       .catch((err) => {
         if (!cancelled) {
@@ -284,12 +302,6 @@ const CoursePlayerPage = ({ slug }) => {
       cancelled = true;
     };
   }, [slug, userId]);
-
-  useEffect(() => {
-    if (course?.courseId && lessonId) {
-      setNote(getLessonNote(course.courseId, lessonId));
-    }
-  }, [course?.courseId, lessonId]);
 
   useEffect(() => {
     if (!course?.courseId || !lessons.length) {
@@ -601,6 +613,14 @@ const CoursePlayerPage = ({ slug }) => {
           <Share2 className="size-3.5" />
           <span className="hidden sm:inline">Chia sẻ</span>
         </button>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center gap-1 rounded-full px-2 text-xs text-white/75 transition hover:bg-white/10"
+          onClick={() => setTab("notes")}
+        >
+          <StickyNote className="size-3.5" />
+          <span className="hidden sm:inline">Ghi chú</span>
+        </button>
         <div className="relative" ref={inboxRef}>
           <button
             type="button"
@@ -760,7 +780,10 @@ const CoursePlayerPage = ({ slug }) => {
                   node.volume = volume;
                   node.muted = muted;
                   const saved = getPlayerProgress(course.courseId).positions[current.id];
-                  if (Number(saved) > 3) {
+                  if (pendingSeekRef.current != null) {
+                    node.currentTime = pendingSeekRef.current;
+                    pendingSeekRef.current = null;
+                  } else if (Number(saved) > 3) {
                     node.currentTime = Number(saved);
                   }
                   lastPlayheadRef.current = node.currentTime;
@@ -1028,24 +1051,15 @@ const CoursePlayerPage = ({ slug }) => {
               </div>
             ) : null}
             {tab === "notes" ? (
-              <div className="max-w-3xl">
-                <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                  <StickyNote className="size-4 text-violet-700" />
-                  Ghi chú cho bài này
-                </div>
-                <textarea
-                  value={note}
-                  rows={8}
-                  placeholder="Viết ghi chú của bạn..."
-                  className="w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-violet-700/30"
-                  onChange={(event) => {
-                    setNote(event.target.value);
-                    if (course.courseId && current) {
-                      saveLessonNote(course.courseId, current.id, event.target.value);
-                    }
-                  }}
-                />
-              </div>
+              <CourseNotes
+                slug={slug}
+                courseId={course.courseId}
+                lessons={lessons}
+                current={current}
+                formatClock={formatClock}
+                getCurrentTime={getCurrentTime}
+                onJump={jumpToNote}
+              />
             ) : null}
             {tab === "tools" ? (
               <div className="grid max-w-3xl gap-3 sm:grid-cols-2">

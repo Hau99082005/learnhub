@@ -130,7 +130,7 @@ function LearningCard({ item, lists, archived, onArchive, onAddList }) {
         {item.certificateCode ? (
           <a
             href={`/chung-chi/${item.certificateCode}`}
-            className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-semibold text-amber-950 shadow-sm"
+            className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-none bg-violet-700 px-2 py-1 text-[11px] font-semibold text-white"
           >
             <Award className="size-3" />
             {item.gradeLabel || "Chứng chỉ"}
@@ -854,7 +854,7 @@ const LearningPage = () => {
                     {CERT_SCALE.map((row) => (
                       <span
                         key={row.grade}
-                        className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+                        className="rounded-none border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs text-violet-700"
                       >
                         {row.min > 0 ? `≥ ${row.min}%` : "< 50%"} · {row.label}
                       </span>
@@ -877,7 +877,7 @@ const LearningPage = () => {
                   {CERT_SCALE.map((row) => (
                     <span
                       key={row.grade}
-                      className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground"
+                      className="rounded-none border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs text-violet-700"
                     >
                       {row.min > 0 ? `≥ ${row.min}%` : "< 50%"} · {row.label}
                     </span>

@@ -579,7 +579,7 @@ const CoursePlayerPage = ({ slug }) => {
         {course.certificateCode ? (
           <a
             href={`/chung-chi/${course.certificateCode}`}
-            className="hidden h-8 items-center gap-1 rounded-full bg-amber-400 px-2.5 text-xs font-semibold text-amber-950 transition hover:bg-amber-300 sm:inline-flex"
+            className="hidden h-8 items-center gap-1 rounded-none bg-violet-700 px-2.5 text-xs font-semibold text-white transition hover:bg-violet-800 sm:inline-flex"
           >
             <Award className="size-3.5" />
             Chứng chỉ
@@ -673,7 +673,7 @@ const CoursePlayerPage = ({ slug }) => {
       {course.issuesCertificate ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/5 px-3 py-2 text-xs sm:px-4">
           <p className="inline-flex items-center gap-1.5 text-white/80">
-            <Award className="size-3.5 text-amber-300" />
+            <Award className="size-3.5 text-violet-300" />
             {course.certificateCode
               ? `Đã cấp chứng chỉ · ${course.gradeLabel || certMeta.label} · ${percent}% xem video`
               : percent >= CERT_PASS
@@ -681,7 +681,7 @@ const CoursePlayerPage = ({ slug }) => {
                 : `Xem từ ${CERT_PASS}% video để nhận chứng chỉ · Hiện tại ${percent}% · ${certMeta.label}`}
           </p>
           {course.certificateCode ? (
-            <a href={`/chung-chi/${course.certificateCode}`} className="font-medium text-amber-300 hover:text-amber-200">
+            <a href={`/chung-chi/${course.certificateCode}`} className="font-medium text-violet-300 hover:text-violet-200">
               Xem bằng cấp
             </a>
           ) : (

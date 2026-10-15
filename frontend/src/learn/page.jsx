@@ -37,7 +37,7 @@ import {
   savePlayerProgress,
   watchCoveragePercent,
 } from "@/lib/learning";
-import { CERT_PASS, courseWatchPercent, gradeMeta } from "@/lib/certificate";
+import { CERT_PASS, courseWatchPercent, gradeMeta, nextGradeTarget } from "@/lib/certificate";
 import {
   getInboxItems,
   inboxUnread,
@@ -147,6 +147,7 @@ const CoursePlayerPage = ({ slug }) => {
     courseWatchPercent(lessons, completed, watched, rangesRef.current),
   );
   const certMeta = gradeMeta(course?.grade, percent);
+  const nextGrade = nextGradeTarget(percent);
 
   const persist = useCallback(
     (patch) => {
@@ -675,7 +676,9 @@ const CoursePlayerPage = ({ slug }) => {
           <p className="inline-flex items-center gap-1.5 text-white/80">
             <Award className="size-3.5 text-violet-300" />
             {course.certificateCode
-              ? `Đã cấp chứng chỉ · ${course.gradeLabel || certMeta.label} · ${percent}% xem video`
+              ? nextGrade
+                ? `Chứng chỉ ${course.gradeLabel || certMeta.label} · ${percent}% · Còn ${nextGrade.remain}% để lên ${nextGrade.label}`
+                : `Chứng chỉ ${course.gradeLabel || certMeta.label} · ${percent}% · Đã đạt xếp loại cao nhất`
               : percent >= CERT_PASS
                 ? `Đủ điều kiện nhận chứng chỉ · ${certMeta.label}`
                 : `Xem từ ${CERT_PASS}% video để nhận chứng chỉ · Hiện tại ${percent}% · ${certMeta.label}`}

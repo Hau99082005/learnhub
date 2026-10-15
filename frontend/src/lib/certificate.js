@@ -8,6 +8,27 @@ export const CERT_SCALE = [
   { grade: "KHONG_DAT", label: "Không đạt", min: 0, hint: "Dưới 50% video" },
 ];
 
+export const GRADE_STEPS = [
+  { grade: "TRUNG_BINH", label: "Trung bình", min: 50 },
+  { grade: "KHA", label: "Khá", min: 65 },
+  { grade: "GIOI", label: "Giỏi", min: 80 },
+  { grade: "XUAT_SAC", label: "Xuất sắc", min: 90 },
+];
+
+export function nextGradeTarget(percent) {
+  const value = Number(percent);
+  const watch = Number.isFinite(value) ? value : 0;
+  for (const step of GRADE_STEPS) {
+    if (watch < step.min) {
+      return {
+        ...step,
+        remain: Math.max(1, Math.ceil(step.min - watch)),
+      };
+    }
+  }
+  return null;
+}
+
 export function gradeOf(percent) {
   const value = Number(percent);
   if (!Number.isFinite(value) || value < CERT_PASS) {

@@ -6,6 +6,7 @@ import {
   GraduationCap,
   Hash,
   Medal,
+  Play,
   Printer,
   Share2,
   Sparkles,
@@ -14,7 +15,7 @@ import {
 import { toast } from "sonner";
 import logoLearnHub from "@/assets/icons/Logo LearnHub (1)-Photoroom.png";
 import { buttonVariants } from "@/components/ui/button";
-import { CERT_PASS, formatCertDate, gradeMeta } from "@/lib/certificate";
+import { CERT_PASS, formatCertDate, gradeMeta, nextGradeTarget } from "@/lib/certificate";
 import { cn } from "@/lib/utils";
 
 const FONT = {
@@ -40,6 +41,8 @@ export function CertificateView({ cert, actions = true, compact = false }) {
   const meta = gradeMeta(cert?.grade, watch);
   const issued = formatCertDate(cert?.issuedAt);
   const enrolled = formatCertDate(cert?.enrolledAt);
+  const next = nextGradeTarget(watch);
+  const learnHref = cert?.slug ? `/hoc/${cert.slug}` : "/hoc-tap";
 
   return (
     <div
@@ -142,6 +145,15 @@ export function CertificateView({ cert, actions = true, compact = false }) {
             <InfoTile icon={UserRound} label="Giảng viên" value={cert?.instructorName || "LearnHub"} />
             <InfoTile icon={CalendarDays} label="Ngày cấp" value={issued || "—"} />
           </div>
+          {next ? (
+            <p className="mt-4 text-center text-violet-700" style={TYPE.small}>
+              Bằng cấp còn nâng được. Xem thêm {next.remain}% video để lên {next.label}.
+            </p>
+          ) : (
+            <p className="mt-4 text-center text-violet-700" style={TYPE.small}>
+              Đã đạt xếp loại cao nhất.
+            </p>
+          )}
 
           {!compact ? (
             <div className="mt-6 flex flex-col items-center justify-between gap-5 border-t border-violet-100 pt-6 sm:flex-row">
@@ -181,12 +193,27 @@ export function CertificateView({ cert, actions = true, compact = false }) {
 
           {actions ? (
             <div className="cert-actions mt-6 flex flex-wrap justify-center gap-2">
+              {next ? (
+                <a
+                  href={learnHref}
+                  style={TYPE.button}
+                  className={cn(
+                    buttonVariants({ variant: "default" }),
+                    "h-10 rounded-none bg-violet-700 text-white hover:bg-violet-800",
+                  )}
+                >
+                  <Play className="size-4" />
+                  Tiếp tục học để lên {next.label}
+                </a>
+              ) : null}
               <button
                 type="button"
                 style={TYPE.button}
                 className={cn(
                   buttonVariants({ variant: "default" }),
-                  "h-10 rounded-none bg-violet-700 text-white hover:bg-violet-800",
+                  next
+                    ? "h-10 rounded-none border border-violet-700 bg-white text-violet-700 hover:bg-violet-50"
+                    : "h-10 rounded-none bg-violet-700 text-white hover:bg-violet-800",
                 )}
                 onClick={() => window.print()}
               >
@@ -237,11 +264,13 @@ function InfoTile({ icon: Icon, label, value }) {
 export function CertificateCard({ item }) {
   const watch = Number(item.progressPercent ?? item.watchPercent) || 0;
   const meta = gradeMeta(item.grade, watch);
-  const href = item.certificateCode ? `/chung-chi/${item.certificateCode}` : `/hoc/${item.slug}`;
+  const next = nextGradeTarget(watch);
+  const learnHref = `/hoc/${item.slug}`;
+  const certHref = item.certificateCode ? `/chung-chi/${item.certificateCode}` : learnHref;
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-none border border-violet-200 bg-white transition duration-300 hover:border-violet-700">
-      <a href={href} className="relative block overflow-hidden">
+      <a href={learnHref} className="relative block overflow-hidden">
         <div className="aspect-[16/10] bg-violet-950">
           {item.images ? (
             <img
@@ -266,7 +295,7 @@ export function CertificateCard({ item }) {
         </div>
       </a>
       <div className="flex flex-1 flex-col gap-3 p-4">
-        <a href={href} className="min-w-0">
+        <a href={learnHref} className="min-w-0">
           <h3 className="line-clamp-2 text-zinc-950 transition-colors group-hover:text-violet-700" style={TYPE.value}>
             {item.title || item.courseTitle}
           </h3>
@@ -278,17 +307,39 @@ export function CertificateCard({ item }) {
           <Hash className="size-3.5" />
           {item.certificateCode}
         </p>
-        <a
-          href={href}
-          style={TYPE.button}
-          className={cn(
-            buttonVariants({ variant: "default" }),
-            "mt-auto h-9 rounded-none bg-violet-700 text-white hover:bg-violet-800",
-          )}
-        >
-          <Medal className="size-4" />
-          Xem bằng cấp
-        </a>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-zinc-500" style={TYPE.small}>
+            <span>{Math.round(watch)}%</span>
+            <span>{next ? `Còn ${next.remain}% lên ${next.label}` : "Đã đạt Xuất sắc"}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-none bg-violet-100">
+            <div className="h-full rounded-none bg-violet-700 transition-all" style={{ width: `${Math.min(100, watch)}%` }} />
+          </div>
+        </div>
+        <div className="mt-auto grid gap-2">
+          <a
+            href={learnHref}
+            style={TYPE.button}
+            className={cn(
+              buttonVariants({ variant: "default" }),
+              "h-9 rounded-none bg-violet-700 text-white hover:bg-violet-800",
+            )}
+          >
+            <Play className="size-4" />
+            {next ? `Tiếp tục học để lên ${next.label}` : "Tiếp tục học"}
+          </a>
+          <a
+            href={certHref}
+            style={TYPE.button}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-9 rounded-none border-violet-700 text-violet-700 hover:bg-violet-50",
+            )}
+          >
+            <Medal className="size-4" />
+            Xem bằng cấp
+          </a>
+        </div>
       </div>
     </article>
   );

@@ -86,7 +86,7 @@ export function formatCertDate(value) {
   });
 }
 
-export function courseWatchPercent(lessons, completed, watched) {
+export function courseWatchPercent(lessons, completed, watched, ranges) {
   const rows = Array.isArray(lessons) ? lessons : [];
   if (!rows.length) {
     return 0;
@@ -94,11 +94,17 @@ export function courseWatchPercent(lessons, completed, watched) {
   const done = new Set(completed || []);
   let sum = 0;
   for (const lesson of rows) {
+    const lessonRanges = ranges?.[lesson.id];
+    const hasRange = Array.isArray(lessonRanges) && lessonRanges.length > 0;
+    const raw = Number(watched?.[lesson.id]);
+    if (hasRange) {
+      sum += Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
+      continue;
+    }
     if (done.has(lesson.id)) {
       sum += 100;
       continue;
     }
-    const raw = Number(watched?.[lesson.id]);
     sum += Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
   }
   return sum / rows.length;

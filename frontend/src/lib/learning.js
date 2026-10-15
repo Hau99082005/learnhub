@@ -169,25 +169,78 @@ export function getStreak() {
   };
 }
 
+export function asWatchRanges(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((row) => Array.isArray(row) && row.length >= 2)
+    .map((row) => [Math.max(0, Number(row[0]) || 0), Math.max(0, Number(row[1]) || 0)])
+    .filter(([start, end]) => end > start);
+}
+
+export function mergeWatchRange(ranges, start, end) {
+  const from = Math.max(0, Math.min(Number(start) || 0, Number(end) || 0));
+  const to = Math.max(Number(start) || 0, Number(end) || 0);
+  if (to - from < 0.05) {
+    return asWatchRanges(ranges);
+  }
+  const next = [...asWatchRanges(ranges), [from, to]].sort((left, right) => left[0] - right[0]);
+  const merged = [];
+  for (const pair of next) {
+    const last = merged[merged.length - 1];
+    if (!last || pair[0] > last[1] + 0.35) {
+      merged.push([pair[0], pair[1]]);
+    } else {
+      last[1] = Math.max(last[1], pair[1]);
+    }
+  }
+  return merged;
+}
+
+export function watchCoveragePercent(ranges, duration) {
+  const total = Number(duration) || 0;
+  if (total <= 0) {
+    return 0;
+  }
+  const covered = asWatchRanges(ranges).reduce(
+    (sum, [start, end]) => sum + Math.max(0, end - start),
+    0,
+  );
+  return Math.min(100, (covered / total) * 100);
+}
+
 export function getPlayerProgress(courseId) {
   const all = readJson(PLAYER_KEY, {});
   const row = all && typeof all === "object" ? all[String(courseId)] : null;
+  const rawRanges = row?.watchedRanges && typeof row.watchedRanges === "object" ? row.watchedRanges : {};
+  const watchedRanges = {};
+  Object.entries(rawRanges).forEach(([key, value]) => {
+    watchedRanges[key] = asWatchRanges(value);
+  });
   return {
     lastLessonId: Number(row?.lastLessonId) || null,
     completed: asIds(row?.completed),
     positions: row?.positions && typeof row.positions === "object" ? row.positions : {},
     watched: row?.watched && typeof row.watched === "object" ? row.watched : {},
+    watchedRanges,
   };
 }
 
 export function savePlayerProgress(courseId, patch) {
   const all = readJson(PLAYER_KEY, {});
   const current = getPlayerProgress(courseId);
+  const nextRanges = patch.watchedRanges || current.watchedRanges;
+  const watchedRanges = {};
+  Object.entries(nextRanges || {}).forEach(([key, value]) => {
+    watchedRanges[key] = asWatchRanges(value);
+  });
   const next = {
     lastLessonId: patch.lastLessonId ?? current.lastLessonId,
     completed: patch.completed ? asIds(patch.completed) : current.completed,
     positions: patch.positions || current.positions,
     watched: patch.watched || current.watched,
+    watchedRanges,
   };
   writeJson(PLAYER_KEY, { ...all, [String(courseId)]: next });
   return next;

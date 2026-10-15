@@ -31,9 +31,11 @@ import {
   getLessonNote,
   getPlayerProgress,
   markAccessed,
+  mergeWatchRange,
   recordStreakVisit,
   saveLessonNote,
   savePlayerProgress,
+  watchCoveragePercent,
 } from "@/lib/learning";
 import { CERT_PASS, courseWatchPercent, gradeMeta } from "@/lib/certificate";
 import {
@@ -97,6 +99,11 @@ const CoursePlayerPage = ({ slug }) => {
   const completedRef = useRef([]);
   const currentIdRef = useRef(null);
   const watchedRef = useRef({});
+  const rangesRef = useRef({});
+  const lastPlayheadRef = useRef(null);
+  const seekingRef = useRef(false);
+  const seekWarnedRef = useRef(new Set());
+  const seekTimerRef = useRef(0);
   const [course, setCourse] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -136,7 +143,9 @@ const CoursePlayerPage = ({ slug }) => {
   const nextLesson = currentIndex >= 0 ? lessons[currentIndex + 1] : null;
   const completedSet = useMemo(() => new Set(completed), [completed]);
   const doneCount = lessons.filter((item) => completedSet.has(item.id)).length;
-  const percent = Math.round(courseWatchPercent(lessons, completed, watched));
+  const percent = Math.round(
+    courseWatchPercent(lessons, completed, watched, rangesRef.current),
+  );
   const certMeta = gradeMeta(course?.grade, percent);
 
   const persist = useCallback(
@@ -144,10 +153,63 @@ const CoursePlayerPage = ({ slug }) => {
       if (!course?.courseId) {
         return getPlayerProgress(0);
       }
-      return savePlayerProgress(course.courseId, patch);
+      return savePlayerProgress(course.courseId, {
+        watchedRanges: rangesRef.current,
+        ...patch,
+      });
     },
     [course?.courseId],
   );
+
+  const noteSeekSkip = useCallback((id, from, to) => {
+    if (from == null || to <= from + 2.2 || !id || seekWarnedRef.current.has(id)) {
+      return;
+    }
+    seekWarnedRef.current.add(id);
+    toast.message("Phần tua nhanh không được tính vào tiến độ chứng chỉ");
+  }, []);
+
+  const armSeek = useCallback(() => {
+    seekingRef.current = true;
+    window.clearTimeout(seekTimerRef.current);
+    seekTimerRef.current = window.setTimeout(() => {
+      seekingRef.current = false;
+    }, 280);
+  }, []);
+
+  const creditWatch = useCallback((node, id) => {
+    if (!node || !id || !(node.duration > 0)) {
+      return Number(watchedRef.current[id]) || 0;
+    }
+    const now = node.currentTime;
+    const last = lastPlayheadRef.current;
+    if (seekingRef.current) {
+      return Number(watchedRef.current[id]) || 0;
+    }
+    if (last == null) {
+      lastPlayheadRef.current = now;
+      return Number(watchedRef.current[id]) || 0;
+    }
+    const rate = Number(node.playbackRate) || 1;
+    const maxJump = Math.max(2.8, rate * 1.8);
+    if (now > last + maxJump) {
+      noteSeekSkip(id, last, now);
+      lastPlayheadRef.current = now;
+      return Number(watchedRef.current[id]) || 0;
+    }
+    if (now > last) {
+      rangesRef.current = {
+        ...rangesRef.current,
+        [id]: mergeWatchRange(rangesRef.current[id], last, now),
+      };
+      watchedRef.current = {
+        ...watchedRef.current,
+        [id]: watchCoveragePercent(rangesRef.current[id], node.duration),
+      };
+    }
+    lastPlayheadRef.current = now;
+    return Number(watchedRef.current[id]) || 0;
+  }, [noteSeekSkip]);
 
   const selectLesson = useCallback(
     (id) => {
@@ -161,6 +223,8 @@ const CoursePlayerPage = ({ slug }) => {
       );
       persist({ lastLessonId: lesson.id });
       lastSavedSec.current = -1;
+      lastPlayheadRef.current = null;
+      seekingRef.current = false;
       window.history.replaceState(null, "", `/hoc/${slug}?bai=${lesson.id}`);
     },
     [lessons, persist, slug],
@@ -184,6 +248,7 @@ const CoursePlayerPage = ({ slug }) => {
         const progress = getPlayerProgress(data.courseId);
         completedRef.current = progress.completed;
         watchedRef.current = progress.watched || {};
+        rangesRef.current = progress.watchedRanges || {};
         setCompleted(progress.completed);
         setWatched(watchedRef.current);
         const flat = flattenLessons(data.sections);
@@ -229,7 +294,12 @@ const CoursePlayerPage = ({ slug }) => {
     if (!course?.courseId || !lessons.length) {
       return undefined;
     }
-    const value = courseWatchPercent(lessons, completed, watchedRef.current);
+    const value = courseWatchPercent(
+      lessons,
+      completed,
+      watchedRef.current,
+      rangesRef.current,
+    );
     const timer = window.setTimeout(() => {
       authPut(`/api/learning/courses/${encodeURIComponent(slug)}/progress`, {
         percent: value,
@@ -317,10 +387,13 @@ const CoursePlayerPage = ({ slug }) => {
       }
       const next = [...completedRef.current, id];
       completedRef.current = next;
-      watchedRef.current = { ...watchedRef.current, [id]: 100 };
       setCompleted(next);
-      setWatched(watchedRef.current);
-      persist({ completed: next, lastLessonId: id, watched: watchedRef.current });
+      persist({
+        completed: next,
+        lastLessonId: id,
+        watched: watchedRef.current,
+        watchedRanges: rangesRef.current,
+      });
     },
     [persist],
   );
@@ -330,12 +403,12 @@ const CoursePlayerPage = ({ slug }) => {
       ? completed.filter((value) => value !== id)
       : [...completed, id];
     completedRef.current = next;
-    watchedRef.current = next.includes(id)
-      ? { ...watchedRef.current, [id]: 100 }
-      : watchedRef.current;
     setCompleted(next);
-    setWatched(watchedRef.current);
-    persist({ completed: next, watched: watchedRef.current });
+    persist({
+      completed: next,
+      watched: watchedRef.current,
+      watchedRanges: rangesRef.current,
+    });
   };
 
   const revealControls = () => {
@@ -357,10 +430,15 @@ const CoursePlayerPage = ({ slug }) => {
     if (!node) {
       return;
     }
+    armSeek();
+    const from = lastPlayheadRef.current ?? node.currentTime;
     node.currentTime = Math.min(
       node.duration || 0,
       Math.max(0, node.currentTime + delta),
     );
+    if (delta > 0) {
+      noteSeekSkip(currentIdRef.current, from, node.currentTime);
+    }
   };
 
   const togglePlay = () => {
@@ -427,7 +505,10 @@ const CoursePlayerPage = ({ slug }) => {
           node.pause();
         }
       } else if (event.key === "ArrowRight" && node) {
+        armSeek();
+        const from = lastPlayheadRef.current ?? node.currentTime;
         node.currentTime = Math.min(node.duration || 0, node.currentTime + 10);
+        noteSeekSkip(currentIdRef.current, from, node.currentTime);
       } else if (event.key === "ArrowLeft" && node) {
         node.currentTime = Math.max(0, node.currentTime - 10);
       } else if (event.key === "f") {
@@ -604,7 +685,7 @@ const CoursePlayerPage = ({ slug }) => {
               Xem bằng cấp
             </a>
           ) : (
-            <span className="text-white/50">50% TB · 65% Khá · 80% Giỏi · 90% Xuất sắc</span>
+            <span className="text-white/50">Tua nhanh không tính · 50% TB · 65% Khá · 80% Giỏi · 90% Xuất sắc</span>
           )}
         </div>
       ) : null}
@@ -627,6 +708,18 @@ const CoursePlayerPage = ({ slug }) => {
                 onClick={togglePlay}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
+                onSeeking={() => {
+                  armSeek();
+                }}
+                onSeeked={(event) => {
+                  const node = event.currentTarget;
+                  const id = currentIdRef.current;
+                  const from = lastPlayheadRef.current;
+                  const to = node.currentTime;
+                  noteSeekSkip(id, from, to);
+                  lastPlayheadRef.current = to;
+                  seekingRef.current = false;
+                }}
                 onTimeUpdate={(event) => {
                   const node = event.currentTarget;
                   paintTime(node.currentTime);
@@ -635,24 +728,24 @@ const CoursePlayerPage = ({ slug }) => {
                   if (!courseId || !id) {
                     return;
                   }
+                  const coverage = creditWatch(node, id);
                   const sec = Math.floor(node.currentTime);
                   if (sec - lastSavedSec.current >= 5 || lastSavedSec.current < 0) {
                     lastSavedSec.current = sec;
-                    const ratio = node.duration > 0 ? (node.currentTime / node.duration) * 100 : 0;
-                    const prevWatch = Number(watchedRef.current[id]) || 0;
-                    watchedRef.current = {
-                      ...watchedRef.current,
-                      [id]: Math.max(prevWatch, Math.min(100, ratio)),
-                    };
                     const positions = {
                       ...getPlayerProgress(courseId).positions,
                       [id]: sec,
                     };
-                    persist({ lastLessonId: id, positions, watched: watchedRef.current });
-                    setWatched(watchedRef.current);
+                    persist({
+                      lastLessonId: id,
+                      positions,
+                      watched: watchedRef.current,
+                      watchedRanges: rangesRef.current,
+                    });
+                    setWatched({ ...watchedRef.current });
                     setWatchTick((value) => value + 1);
                   }
-                  if (node.duration > 0 && node.currentTime / node.duration >= 0.9) {
+                  if (coverage >= 90) {
                     markDone(id);
                   }
                 }}
@@ -667,24 +760,19 @@ const CoursePlayerPage = ({ slug }) => {
                   if (Number(saved) > 3) {
                     node.currentTime = Number(saved);
                   }
-                  if (node.duration > 0) {
-                    const ratio = (node.currentTime / node.duration) * 100;
-                    const prevWatch = Number(watchedRef.current[current.id]) || 0;
-                    if (ratio > prevWatch) {
-                      watchedRef.current = {
-                        ...watchedRef.current,
-                        [current.id]: Math.min(100, ratio),
-                      };
-                      setWatched(watchedRef.current);
-                    }
-                  }
+                  lastPlayheadRef.current = node.currentTime;
+                  seekingRef.current = false;
                   paintTime(node.currentTime);
                   if (progressRef.current) {
                     progressRef.current.max = String(durationRef.current);
                   }
                 }}
-                onEnded={() => {
-                  markDone(current.id);
+                onEnded={(event) => {
+                  const node = event.currentTarget;
+                  const coverage = creditWatch(node, current.id);
+                  if (coverage >= 90) {
+                    markDone(current.id);
+                  }
                   if (nextLesson) {
                     selectLesson(nextLesson.id);
                   }
@@ -729,9 +817,12 @@ const CoursePlayerPage = ({ slug }) => {
                 className="h-1.5 w-full cursor-pointer accent-violet-500"
                 onChange={(event) => {
                   const value = Number(event.target.value);
+                  armSeek();
+                  const from = lastPlayheadRef.current;
                   if (videoRef.current) {
                     videoRef.current.currentTime = value;
                   }
+                  noteSeekSkip(currentIdRef.current, from, value);
                   paintTime(value);
                 }}
               />
@@ -959,7 +1050,7 @@ const CoursePlayerPage = ({ slug }) => {
                   <BookOpen className="size-5 text-violet-700" />
                   <p className="mt-2 font-medium">Phím tắt</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Space phát/dừng · ← → tua 10s · M tắt tiếng · F toàn màn hình
+                    Space phát/dừng · ← → tua 10s (tua tới không tính tiến độ) · M tắt tiếng · F toàn màn hình
                   </p>
                 </div>
                 <div className="rounded-2xl border border-border p-4">

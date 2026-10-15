@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.learnhub.backend.modules.cart.repositories.CertificateRepository;
 import com.learnhub.backend.modules.coupon.models.Coupon;
 import com.learnhub.backend.modules.coupon.repositories.CouponRepository;
 import com.learnhub.backend.modules.notify.dtos.InboxCountDTO;
@@ -23,14 +24,17 @@ import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfa
 public class InboxService {
     private final AppNotificationRepository notifications;
     private final CouponRepository coupons;
+    private final CertificateRepository certificates;
     private final UserServicesInterfaces userServices;
 
     public InboxService(
             AppNotificationRepository notifications,
             CouponRepository coupons,
+            CertificateRepository certificates,
             UserServicesInterfaces userServices) {
         this.notifications = notifications;
         this.coupons = coupons;
+        this.certificates = certificates;
         this.userServices = userServices;
     }
 
@@ -96,6 +100,12 @@ public class InboxService {
         String href = "/thong-bao";
         if ("PAYMENT".equalsIgnoreCase(row.getType())) {
             href = "/hoc-tap";
+        } else if (("CERTIFICATE".equalsIgnoreCase(row.getType())
+                || "CERTIFICATE_GRADE".equalsIgnoreCase(row.getType()))
+                && row.getReferenceId() != null) {
+            href = certificates.findByEnrollmentId(row.getReferenceId())
+                    .map((cert) -> "/chung-chi/" + cert.getCertificateCode())
+                    .orElse("/hoc-tap?tab=certs");
         } else if ("COUPON".equalsIgnoreCase(row.getType()) && row.getReferenceId() != null) {
             couponCode = coupons.findById(row.getReferenceId()).map(Coupon::getCode).orElse(null);
             href = couponCode == null ? "/thanh-toan" : "/thanh-toan?coupon=" + couponCode;

@@ -21,6 +21,7 @@ import PurchaseHistoryPage from "@/purchases/page"
 import SettingsPage from "@/settings/page"
 import LearningPage from "@/learning/page"
 import CoursePlayerPage from "@/learn/page"
+import CertificatePage from "@/certificate/page"
 import NotificationsPage from "@/notifications/page"
 import PaymentMethodsPage from "@/payments/page"
 import { Toaster } from "@/components/ui/sonner"
@@ -101,6 +102,18 @@ function App() {
         <Suspense fallback={<div className="min-h-screen bg-background" />}>
           <AdminPage />
         </Suspense>
+        <Toaster position="top-center" richColors />
+      </>
+    )
+  }
+
+  const certCode = path.startsWith("/chung-chi/")
+    ? decodeURIComponent(path.split("/").filter(Boolean)[1] || "")
+    : ""
+  if (certCode) {
+    return (
+      <>
+        <CertificatePage code={certCode} />
         <Toaster position="top-center" richColors />
       </>
     )

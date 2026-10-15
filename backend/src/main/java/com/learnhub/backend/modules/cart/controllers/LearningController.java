@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.learnhub.backend.modules.cart.dtos.CertificateDTO;
 import com.learnhub.backend.modules.cart.dtos.CoursePlayerDTO;
 import com.learnhub.backend.modules.cart.dtos.LearningItemDTO;
 import com.learnhub.backend.modules.cart.dtos.LearningProgressRequest;
@@ -31,6 +32,17 @@ public class LearningController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestParam(value = "q", required = false) String query) {
         return ResponseEntity.ok(learningService.listMine(authorization, query));
+    }
+
+    @GetMapping("/certificates")
+    public ResponseEntity<List<CertificateDTO>> certificates(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(learningService.listCertificates(authorization));
+    }
+
+    @GetMapping("/certificates/{code}")
+    public ResponseEntity<CertificateDTO> certificate(@PathVariable String code) {
+        return ResponseEntity.ok(learningService.getCertificate(code));
     }
 
     @GetMapping("/courses/{slug}")

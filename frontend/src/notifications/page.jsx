@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Award,
   Bell,
   CheckCheck,
   Copy,
@@ -55,6 +56,9 @@ function iconOf(type) {
   }
   if (type === "COUPON") {
     return Gift;
+  }
+  if (type === "CERTIFICATE" || type === "CERTIFICATE_GRADE") {
+    return Award;
   }
   return Bell;
 }
@@ -184,7 +188,9 @@ const NotificationsPage = () => {
                         "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full",
                         item.type === "PAYMENT"
                           ? "bg-emerald-500/15 text-emerald-500"
-                          : "bg-violet-700/15 text-violet-600 dark:text-violet-300",
+                          : item.type === "CERTIFICATE" || item.type === "CERTIFICATE_GRADE"
+                            ? "bg-amber-400/20 text-amber-600"
+                            : "bg-violet-700/15 text-violet-600 dark:text-violet-300",
                       )}
                     >
                       <Icon className="size-5" />
@@ -233,6 +239,8 @@ const NotificationsPage = () => {
                             ? "Áp dụng mã"
                             : item.type === "PAYMENT"
                               ? "Vào học tập"
+                              : item.type === "CERTIFICATE" || item.type === "CERTIFICATE_GRADE"
+                                ? "Xem chứng chỉ"
                               : "Xem chi tiết"}
                         </a>
                       </div>

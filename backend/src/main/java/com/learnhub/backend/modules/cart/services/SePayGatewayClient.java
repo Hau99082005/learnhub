@@ -22,6 +22,7 @@ import org.springframework.web.client.RestClientResponseException;
 import com.learnhub.backend.config.SePayProperties;
 import com.learnhub.backend.modules.cart.dtos.SePayGatewayDTO;
 import com.learnhub.backend.modules.cart.models.ShopOrder;
+import com.learnhub.backend.modules.instructor.support.VnBanks;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -104,15 +105,18 @@ public class SePayGatewayClient {
         if (!trim(hint.customData()).isBlank()) {
             fields.put("custom_data", trim(hint.customData()));
         }
+        if (!trim(hint.accountNumber()).isBlank()) {
+            fields.put("account_number", trim(hint.accountNumber()));
+            fields.put("acc", trim(hint.accountNumber()));
+        }
+        if (!trim(hint.bank()).isBlank()) {
+            String bank = trim(hint.bank());
+            fields.put("bank", bank);
+            fields.put("bank_code", VnBanks.sepayShortName(bank));
+            fields.put("bank_short_name", VnBanks.sepayShortName(bank));
+        }
         if (!trim(hint.bankAccountId()).isBlank()) {
             fields.put("bank_account_id", trim(hint.bankAccountId()));
-            if (!trim(hint.accountNumber()).isBlank()) {
-                fields.put("account_number", trim(hint.accountNumber()));
-            }
-            if (!trim(hint.bank()).isBlank()) {
-                fields.put("bank", trim(hint.bank()));
-                fields.put("bank_code", trim(hint.bank()));
-            }
         }
         fields.put("signature", sign(fields, secret));
         return new SePayGatewayDTO(sePayProperties.getCheckoutUrl(), fields);

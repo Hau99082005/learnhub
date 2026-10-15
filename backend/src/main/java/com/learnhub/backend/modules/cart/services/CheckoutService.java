@@ -719,9 +719,21 @@ public class CheckoutService {
                     sync);
         }
         SePayGatewayDTO gateway = null;
-        boolean instructorOwnBank = filled(payee.accountNumber())
-                && !sameAccount(payee.accountNumber(), sePayProperties.getAccountNumber());
-        if ("PENDING".equalsIgnoreCase(order.getStatus()) && !instructorOwnBank) {
+        if ("PENDING".equalsIgnoreCase(order.getStatus())) {
+            Long instructorId = payee.instructorId();
+            String accountNumber = payee.accountNumber();
+            if (filled(accountNumber) && !filled(payee.sepayAccountId())) {
+                sePayTransactions.invalidateBankCache();
+                sePayTransactions.findLinkedAccount(accountNumber).ifPresent((linked) -> {
+                    if (instructorId != null) {
+                        instructorBanks.findByUser_Id(instructorId).ifPresent((row) -> {
+                            row.setSepayAccountId(linked.id());
+                            instructorBanks.save(row);
+                        });
+                    }
+                });
+                payee = payeeOf(payment, rows);
+            }
             String custom = filled(payee.accountNumber())
                     ? firstNonBlank(payee.bank(), "") + "|" + payee.accountNumber()
                     : "";

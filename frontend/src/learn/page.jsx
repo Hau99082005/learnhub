@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Award,
+  Bell,
   BookOpen,
   CheckCircle2,
   ChevronDown,
@@ -33,6 +35,15 @@ import {
   saveLessonNote,
   savePlayerProgress,
 } from "@/lib/learning";
+import { CERT_PASS, courseWatchPercent, gradeMeta } from "@/lib/certificate";
+import {
+  getInboxItems,
+  inboxUnread,
+  loadInbox,
+  loadInboxCount,
+  markInboxRead,
+  onInboxChange,
+} from "@/lib/inbox";
 import { cn } from "@/lib/utils";
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -85,6 +96,7 @@ const CoursePlayerPage = ({ slug }) => {
   const controlsRef = useRef(true);
   const completedRef = useRef([]);
   const currentIdRef = useRef(null);
+  const watchedRef = useRef({});
   const [course, setCourse] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -104,6 +116,12 @@ const CoursePlayerPage = ({ slug }) => {
   const [note, setNote] = useState("");
   const [showRate, setShowRate] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [watched, setWatched] = useState({});
+  const [watchTick, setWatchTick] = useState(0);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [unread, setUnread] = useState(() => inboxUnread());
+  const [inboxItems, setInboxItems] = useState(() => getInboxItems());
+  const inboxRef = useRef(null);
 
   completedRef.current = completed;
 
@@ -118,9 +136,8 @@ const CoursePlayerPage = ({ slug }) => {
   const nextLesson = currentIndex >= 0 ? lessons[currentIndex + 1] : null;
   const completedSet = useMemo(() => new Set(completed), [completed]);
   const doneCount = lessons.filter((item) => completedSet.has(item.id)).length;
-  const percent = lessons.length
-    ? Math.round((doneCount / lessons.length) * 100)
-    : 0;
+  const percent = Math.round(courseWatchPercent(lessons, completed, watched));
+  const certMeta = gradeMeta(course?.grade, percent);
 
   const persist = useCallback(
     (patch) => {
@@ -166,7 +183,9 @@ const CoursePlayerPage = ({ slug }) => {
         recordStreakVisit();
         const progress = getPlayerProgress(data.courseId);
         completedRef.current = progress.completed;
+        watchedRef.current = progress.watched || {};
         setCompleted(progress.completed);
+        setWatched(watchedRef.current);
         const flat = flattenLessons(data.sections);
         const wanted = Number(
           new URLSearchParams(window.location.search).get("bai"),
@@ -210,14 +229,86 @@ const CoursePlayerPage = ({ slug }) => {
     if (!course?.courseId || !lessons.length) {
       return undefined;
     }
-    const value = (completed.length / lessons.length) * 100;
+    const value = courseWatchPercent(lessons, completed, watchedRef.current);
     const timer = window.setTimeout(() => {
       authPut(`/api/learning/courses/${encodeURIComponent(slug)}/progress`, {
         percent: value,
-      }).catch(() => {});
+      })
+        .then((data) => {
+          setCourse((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  progressPercent: data.progressPercent,
+                  certificateCode: data.certificateCode,
+                  grade: data.grade,
+                  gradeLabel: data.gradeLabel,
+                  issuesCertificate: data.issuesCertificate,
+                }
+              : prev,
+          );
+          if (data.certificateCode && !course.certificateCode) {
+            toast.success(`Đã cấp chứng chỉ xếp loại ${data.gradeLabel}`, {
+              action: {
+                label: "Xem bằng",
+                onClick: () => {
+                  window.location.href = `/chung-chi/${data.certificateCode}`;
+                },
+              },
+            });
+            window.setTimeout(() => loadInbox(), 700);
+          } else if (
+            data.certificateCode &&
+            data.grade &&
+            course.grade &&
+            data.grade !== course.grade
+          ) {
+            toast.success(`Chứng chỉ đã lên hạng ${data.gradeLabel}`, {
+              action: {
+                label: "Xem bằng",
+                onClick: () => {
+                  window.location.href = `/chung-chi/${data.certificateCode}`;
+                },
+              },
+            });
+            window.setTimeout(() => loadInbox(), 700);
+          }
+        })
+        .catch(() => {});
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [completed, course?.courseId, lessons.length, slug]);
+  }, [completed, course?.certificateCode, course?.courseId, course?.grade, lessons, slug, watchTick]);
+
+  useEffect(() => {
+    loadInbox().then((rows) => {
+      setInboxItems(Array.isArray(rows) ? rows : getInboxItems());
+      setUnread(inboxUnread());
+    });
+    const stop = onInboxChange((state) => {
+      setUnread(state.unread || 0);
+      setInboxItems(state.items || []);
+    });
+    const poll = window.setInterval(() => {
+      loadInboxCount().then(setUnread);
+    }, 15000);
+    return () => {
+      stop();
+      window.clearInterval(poll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!inboxOpen) {
+      return undefined;
+    }
+    const onClick = (event) => {
+      if (inboxRef.current && !inboxRef.current.contains(event.target)) {
+        setInboxOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [inboxOpen]);
 
   const markDone = useCallback(
     (id) => {
@@ -226,8 +317,10 @@ const CoursePlayerPage = ({ slug }) => {
       }
       const next = [...completedRef.current, id];
       completedRef.current = next;
+      watchedRef.current = { ...watchedRef.current, [id]: 100 };
       setCompleted(next);
-      persist({ completed: next, lastLessonId: id });
+      setWatched(watchedRef.current);
+      persist({ completed: next, lastLessonId: id, watched: watchedRef.current });
     },
     [persist],
   );
@@ -237,8 +330,12 @@ const CoursePlayerPage = ({ slug }) => {
       ? completed.filter((value) => value !== id)
       : [...completed, id];
     completedRef.current = next;
+    watchedRef.current = next.includes(id)
+      ? { ...watchedRef.current, [id]: 100 }
+      : watchedRef.current;
     setCompleted(next);
-    persist({ completed: next });
+    setWatched(watchedRef.current);
+    persist({ completed: next, watched: watchedRef.current });
   };
 
   const revealControls = () => {
@@ -398,9 +495,18 @@ const CoursePlayerPage = ({ slug }) => {
             {current ? ` · ${current.title}` : ""}
           </p>
         </div>
+        {course.certificateCode ? (
+          <a
+            href={`/chung-chi/${course.certificateCode}`}
+            className="hidden h-8 items-center gap-1 rounded-full bg-amber-400 px-2.5 text-xs font-semibold text-amber-950 transition hover:bg-amber-300 sm:inline-flex"
+          >
+            <Award className="size-3.5" />
+            Chứng chỉ
+          </a>
+        ) : null}
         <button
           type="button"
-          className="hidden h-8 items-center gap-1 rounded-full px-2 text-xs text-white/75 transition hover:bg-white/10 sm:inline-flex"
+          className="inline-flex h-8 items-center gap-1 rounded-full px-2 text-xs text-white/75 transition hover:bg-white/10"
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(window.location.href);
@@ -411,8 +517,69 @@ const CoursePlayerPage = ({ slug }) => {
           }}
         >
           <Share2 className="size-3.5" />
-          Chia sẻ
+          <span className="hidden sm:inline">Chia sẻ</span>
         </button>
+        <div className="relative" ref={inboxRef}>
+          <button
+            type="button"
+            className="relative inline-flex h-8 items-center gap-1 rounded-full px-2 text-xs text-white/75 transition hover:bg-white/10"
+            aria-label="Thông báo"
+            aria-expanded={inboxOpen}
+            onClick={() => {
+              setInboxOpen((value) => !value);
+              if (!inboxOpen) {
+                loadInbox();
+              }
+            }}
+          >
+            <Bell className="size-3.5" />
+            <span className="hidden sm:inline">Thông báo</span>
+            {unread > 0 ? (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-semibold text-white">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            ) : null}
+          </button>
+          {inboxOpen ? (
+            <div className="absolute top-10 right-0 z-50 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 text-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
+                <p className="text-sm font-semibold">Thông báo</p>
+                <a
+                  href="/thong-bao"
+                  className="text-xs text-violet-300 hover:text-violet-200"
+                >
+                  Xem tất cả
+                </a>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {inboxItems.length === 0 ? (
+                  <p className="px-3 py-8 text-center text-sm text-white/55">
+                    Chưa có thông báo
+                  </p>
+                ) : (
+                  inboxItems.slice(0, 6).map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.href || "/thong-bao"}
+                      className={cn(
+                        "block border-b border-white/5 px-3 py-2.5 transition hover:bg-white/5",
+                        item.isRead ? "opacity-70" : "bg-white/5",
+                      )}
+                      onClick={() => {
+                        if (!item.isRead) {
+                          void markInboxRead(item.id);
+                        }
+                      }}
+                    >
+                      <p className="truncate text-sm font-medium">{item.title}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-white/55">{item.body}</p>
+                    </a>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
         <button
           type="button"
           className="inline-flex size-9 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 md:hidden"
@@ -422,6 +589,25 @@ const CoursePlayerPage = ({ slug }) => {
           {sidebar ? <X className="size-5" /> : <ListVideo className="size-5" />}
         </button>
       </header>
+      {course.issuesCertificate ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/5 px-3 py-2 text-xs sm:px-4">
+          <p className="inline-flex items-center gap-1.5 text-white/80">
+            <Award className="size-3.5 text-amber-300" />
+            {course.certificateCode
+              ? `Đã cấp chứng chỉ · ${course.gradeLabel || certMeta.label} · ${percent}% xem video`
+              : percent >= CERT_PASS
+                ? `Đủ điều kiện nhận chứng chỉ · ${certMeta.label}`
+                : `Xem từ ${CERT_PASS}% video để nhận chứng chỉ · Hiện tại ${percent}% · ${certMeta.label}`}
+          </p>
+          {course.certificateCode ? (
+            <a href={`/chung-chi/${course.certificateCode}`} className="font-medium text-amber-300 hover:text-amber-200">
+              Xem bằng cấp
+            </a>
+          ) : (
+            <span className="text-white/50">50% TB · 65% Khá · 80% Giỏi · 90% Xuất sắc</span>
+          )}
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div className="flex min-w-0 flex-1 flex-col">
@@ -452,11 +638,19 @@ const CoursePlayerPage = ({ slug }) => {
                   const sec = Math.floor(node.currentTime);
                   if (sec - lastSavedSec.current >= 5 || lastSavedSec.current < 0) {
                     lastSavedSec.current = sec;
+                    const ratio = node.duration > 0 ? (node.currentTime / node.duration) * 100 : 0;
+                    const prevWatch = Number(watchedRef.current[id]) || 0;
+                    watchedRef.current = {
+                      ...watchedRef.current,
+                      [id]: Math.max(prevWatch, Math.min(100, ratio)),
+                    };
                     const positions = {
                       ...getPlayerProgress(courseId).positions,
                       [id]: sec,
                     };
-                    persist({ lastLessonId: id, positions });
+                    persist({ lastLessonId: id, positions, watched: watchedRef.current });
+                    setWatched(watchedRef.current);
+                    setWatchTick((value) => value + 1);
                   }
                   if (node.duration > 0 && node.currentTime / node.duration >= 0.9) {
                     markDone(id);
@@ -472,6 +666,17 @@ const CoursePlayerPage = ({ slug }) => {
                   const saved = getPlayerProgress(course.courseId).positions[current.id];
                   if (Number(saved) > 3) {
                     node.currentTime = Number(saved);
+                  }
+                  if (node.duration > 0) {
+                    const ratio = (node.currentTime / node.duration) * 100;
+                    const prevWatch = Number(watchedRef.current[current.id]) || 0;
+                    if (ratio > prevWatch) {
+                      watchedRef.current = {
+                        ...watchedRef.current,
+                        [current.id]: Math.min(100, ratio),
+                      };
+                      setWatched(watchedRef.current);
+                    }
                   }
                   paintTime(node.currentTime);
                   if (progressRef.current) {
@@ -782,7 +987,7 @@ const CoursePlayerPage = ({ slug }) => {
                 <div>
                   <p className="text-sm font-semibold">Nội dung khóa học</p>
                   <p className="text-xs text-white/55">
-                    {doneCount}/{lessons.length} bài · {percent}%
+                    {doneCount}/{lessons.length} bài · {percent}% xem video
                   </p>
                 </div>
                 <button

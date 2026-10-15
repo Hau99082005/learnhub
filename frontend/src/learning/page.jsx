@@ -19,7 +19,9 @@ import {
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CertificateCard, CertificateTrackCard } from "@/certificate/CertificateView";
 import { CourseCard, formatDuration, LEVELS } from "@/components/Course";
+import { CERT_PASS, CERT_SCALE } from "@/lib/certificate";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -125,6 +127,15 @@ function LearningCard({ item, lists, archived, onArchive, onAddList }) {
             <Play className="size-5 fill-current" />
           </span>
         </span>
+        {item.certificateCode ? (
+          <a
+            href={`/chung-chi/${item.certificateCode}`}
+            className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-semibold text-amber-950 shadow-sm"
+          >
+            <Award className="size-3" />
+            {item.gradeLabel || "Chứng chỉ"}
+          </a>
+        ) : null}
       </a>
       <div className="flex flex-1 flex-col gap-3 p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-2">
@@ -345,7 +356,7 @@ const LearningPage = () => {
         return false;
       }
       if (tab === "certs") {
-        return item.issuesCertificate && progressOf(item) >= 100;
+        return true;
       }
       if (tab === "lists" || tab === "tools") {
         return false;
@@ -358,15 +369,17 @@ const LearningPage = () => {
     if (instructor !== "all") {
       rows = rows.filter((item) => item.instructorName === instructor);
     }
-    if (progressFilter === "not-started") {
-      rows = rows.filter((item) => progressOf(item) <= 0);
-    } else if (progressFilter === "in-progress") {
-      rows = rows.filter((item) => {
-        const value = progressOf(item);
-        return value > 0 && value < 100;
-      });
-    } else if (progressFilter === "done") {
-      rows = rows.filter((item) => progressOf(item) >= 100);
+    if (tab !== "certs") {
+      if (progressFilter === "not-started") {
+        rows = rows.filter((item) => progressOf(item) <= 0);
+      } else if (progressFilter === "in-progress") {
+        rows = rows.filter((item) => {
+          const value = progressOf(item);
+          return value > 0 && value < 100;
+        });
+      } else if (progressFilter === "done") {
+        rows = rows.filter((item) => progressOf(item) >= 100);
+      }
     }
     rows = [...rows].sort((a, b) => {
       if (sort === "title") {
@@ -782,8 +795,12 @@ const LearningPage = () => {
               letterSpacing: '0.01em'
             }}>
               {loading && items.length === 0 && tab !== "wishlist"
-                ? "Đang tải khóa học..."
-                : `${(tab === "wishlist" ? wishVisible : visible).length} khóa học`}
+                ? tab === "certs"
+                  ? "Đang tải chứng chỉ..."
+                  : "Đang tải khóa học..."
+                : tab === "certs"
+                  ? `${visible.filter((item) => item.certificateCode).length} chứng chỉ`
+                  : `${(tab === "wishlist" ? wishVisible : visible).length} khóa học`}
             </p>
 
             {error ? (
@@ -828,8 +845,22 @@ const LearningPage = () => {
                     ? "Mua khóa học để bắt đầu lộ trình học tập."
                     : tab === "wishlist"
                       ? "Nhấn biểu tượng trái tim trên khóa học để lưu vào đây."
-                      : "Hãy khám phá thêm khóa học trên LearnHub."}
+                      : tab === "certs"
+                        ? `Xem từ ${CERT_PASS}% video bài giảng để nhận chứng chỉ. Dưới 50% không đạt.`
+                        : "Hãy khám phá thêm khóa học trên LearnHub."}
                 </p>
+                {tab === "certs" ? (
+                  <div className="mx-auto mt-5 flex max-w-xl flex-wrap justify-center gap-2">
+                    {CERT_SCALE.map((row) => (
+                      <span
+                        key={row.grade}
+                        className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+                      >
+                        {row.min > 0 ? `≥ ${row.min}%` : "< 50%"} · {row.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 <a
                   href="/khoa-hoc"
                   className={cn(
@@ -839,6 +870,43 @@ const LearningPage = () => {
                 >
                   Khám phá khóa học
                 </a>
+              </div>
+            ) : tab === "certs" ? (
+              <div className="mt-5 space-y-8">
+                <div className="flex flex-wrap gap-2">
+                  {CERT_SCALE.map((row) => (
+                    <span
+                      key={row.grade}
+                      className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground"
+                    >
+                      {row.min > 0 ? `≥ ${row.min}%` : "< 50%"} · {row.label}
+                    </span>
+                  ))}
+                </div>
+                {visible.some((item) => item.certificateCode) ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {visible
+                      .filter((item) => item.certificateCode)
+                      .map((item) => (
+                        <CertificateCard key={item.certificateCode} item={item} />
+                      ))}
+                  </div>
+                ) : null}
+                {visible.some((item) => !item.certificateCode) ? (
+                  <div>
+                    <p className="mb-3 text-sm font-medium">Khóa học đang theo dõi chứng chỉ</p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {visible
+                        .filter((item) => !item.certificateCode)
+                        .map((item) => (
+                          <CertificateTrackCard
+                            key={item.enrollmentId || item.courseId}
+                            item={item}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : tab === "wishlist" ? (
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

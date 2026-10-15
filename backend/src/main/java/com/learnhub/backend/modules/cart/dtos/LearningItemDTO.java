@@ -19,6 +19,9 @@ public class LearningItemDTO {
     private final String status;
     private final String source;
     private final Boolean issuesCertificate;
+    private final String certificateCode;
+    private final String grade;
+    private final String gradeLabel;
     private final LocalDateTime enrolledAt;
     private final LocalDateTime completedAt;
 
@@ -38,6 +41,9 @@ public class LearningItemDTO {
             String status,
             String source,
             Boolean issuesCertificate,
+            String certificateCode,
+            String grade,
+            String gradeLabel,
             LocalDateTime enrolledAt,
             LocalDateTime completedAt) {
         this.enrollmentId = enrollmentId;
@@ -55,6 +61,9 @@ public class LearningItemDTO {
         this.status = status;
         this.source = source;
         this.issuesCertificate = issuesCertificate;
+        this.certificateCode = certificateCode;
+        this.grade = grade;
+        this.gradeLabel = gradeLabel;
         this.enrolledAt = enrolledAt;
         this.completedAt = completedAt;
     }
@@ -117,6 +126,18 @@ public class LearningItemDTO {
 
     public Boolean getIssuesCertificate() {
         return issuesCertificate;
+    }
+
+    public String getCertificateCode() {
+        return certificateCode;
+    }
+
+    public String getGrade() {
+        return grade;
+    }
+
+    public String getGradeLabel() {
+        return gradeLabel;
     }
 
     public LocalDateTime getEnrolledAt() {

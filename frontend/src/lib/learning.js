@@ -176,6 +176,7 @@ export function getPlayerProgress(courseId) {
     lastLessonId: Number(row?.lastLessonId) || null,
     completed: asIds(row?.completed),
     positions: row?.positions && typeof row.positions === "object" ? row.positions : {},
+    watched: row?.watched && typeof row.watched === "object" ? row.watched : {},
   };
 }
 
@@ -186,6 +187,7 @@ export function savePlayerProgress(courseId, patch) {
     lastLessonId: patch.lastLessonId ?? current.lastLessonId,
     completed: patch.completed ? asIds(patch.completed) : current.completed,
     positions: patch.positions || current.positions,
+    watched: patch.watched || current.watched,
   };
   writeJson(PLAYER_KEY, { ...all, [String(courseId)]: next });
   return next;

@@ -16,6 +16,10 @@ public class CoursePlayerDTO {
     private final String instructorName;
     private final Integer durationSeconds;
     private final BigDecimal progressPercent;
+    private final Boolean issuesCertificate;
+    private final String certificateCode;
+    private final String grade;
+    private final String gradeLabel;
     private final List<CourseSectionDTO> sections;
 
     public CoursePlayerDTO(
@@ -29,6 +33,10 @@ public class CoursePlayerDTO {
             String instructorName,
             Integer durationSeconds,
             BigDecimal progressPercent,
+            Boolean issuesCertificate,
+            String certificateCode,
+            String grade,
+            String gradeLabel,
             List<CourseSectionDTO> sections) {
         this.courseId = courseId;
         this.enrollmentId = enrollmentId;
@@ -40,6 +48,10 @@ public class CoursePlayerDTO {
         this.instructorName = instructorName;
         this.durationSeconds = durationSeconds;
         this.progressPercent = progressPercent;
+        this.issuesCertificate = issuesCertificate;
+        this.certificateCode = certificateCode;
+        this.grade = grade;
+        this.gradeLabel = gradeLabel;
         this.sections = sections;
     }
 
@@ -81,6 +93,22 @@ public class CoursePlayerDTO {
 
     public BigDecimal getProgressPercent() {
         return progressPercent;
+    }
+
+    public Boolean getIssuesCertificate() {
+        return issuesCertificate;
+    }
+
+    public String getCertificateCode() {
+        return certificateCode;
+    }
+
+    public String getGrade() {
+        return grade;
+    }
+
+    public String getGradeLabel() {
+        return gradeLabel;
     }
 
     public List<CourseSectionDTO> getSections() {

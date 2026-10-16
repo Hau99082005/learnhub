@@ -128,8 +128,6 @@ public class CheckoutService {
         String couponCode = request == null ? null : request.getCouponCode();
         CheckoutDTO reused = reusePendingCheckout(account, rows, couponCode);
         if (reused != null) {
-            cart.setStatus("CHECKED_OUT");
-            carts.save(cart);
             return reused;
         }
         BigDecimal subtotal = rows.stream()
@@ -172,8 +170,6 @@ public class CheckoutService {
         payment.setProviderTxnId(provider + "-" + order.getOrderCode());
         applyPayee(payment, courseList);
         payments.save(payment);
-        cart.setStatus("CHECKED_OUT");
-        carts.save(cart);
         return toDto(order, payment);
     }
 
@@ -382,7 +378,16 @@ public class CheckoutService {
         String wanted = couponCode == null ? "" : couponCode.trim();
         String have = order.getCoupon() == null ? "" : trimToEmpty(order.getCoupon().getCode());
         if (!wanted.equalsIgnoreCase(have)) {
-            return null;
+            if (wanted.isBlank()) {
+                order.setCoupon(null);
+                order.setDiscountAmount(BigDecimal.ZERO);
+                order.setTotalAmount(order.getSubtotal() == null ? BigDecimal.ZERO : order.getSubtotal());
+            } else {
+                couponService.applyToOrder(order, account.getId(), couponCode, rows);
+            }
+            orders.saveAndFlush(order);
+            payment.setAmount(order.getTotalAmount());
+            payments.save(payment);
         }
         return toDto(order, payment);
     }
@@ -430,6 +435,18 @@ public class CheckoutService {
                 "PAYMENT",
                 "ORDER",
                 orderId)));
+        closeCart(account);
+    }
+
+    private void closeCart(user account) {
+        if (account == null || account.getId() == null) {
+            return;
+        }
+        carts.findByUserIdAndStatus(account.getId(), "ACTIVE").ifPresent((cart) -> {
+            cartItems.deleteByCartId(cart.getId());
+            cart.setStatus("CHECKED_OUT");
+            carts.save(cart);
+        });
     }
 
     private void afterCommit(Runnable action) {

@@ -45,10 +45,13 @@ public class CartService {
         this.userServices = userServices;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public CartDTO getCart(String authorization) {
         user account = requireShopper(authorization);
         Cart cart = carts.findByUserIdAndStatus(account.getId(), "ACTIVE").orElse(null);
+        if (cart == null) {
+            cart = revivePendingCart(account);
+        }
         if (cart == null) {
             return emptyCart();
         }
@@ -105,12 +108,37 @@ public class CartService {
     }
 
     private Cart activeCart(user account) {
-        return carts.findByUserIdAndStatus(account.getId(), "ACTIVE").orElseGet(() -> {
-            Cart created = new Cart();
-            created.setUser(account);
-            created.setStatus("ACTIVE");
-            return carts.saveAndFlush(created);
-        });
+        Cart cart = carts.findByUserIdAndStatus(account.getId(), "ACTIVE").orElse(null);
+        if (cart != null) {
+            return cart;
+        }
+        cart = revivePendingCart(account);
+        if (cart != null) {
+            return cart;
+        }
+        Cart created = new Cart();
+        created.setUser(account);
+        created.setStatus("ACTIVE");
+        return carts.saveAndFlush(created);
+    }
+
+    private Cart revivePendingCart(user account) {
+        Cart cart = carts.findFirstByUser_IdAndStatusOrderByIdDesc(account.getId(), "CHECKED_OUT").orElse(null);
+        if (cart == null) {
+            return null;
+        }
+        List<CartItem> rows = items.findByCartIdWithCourse(cart.getId());
+        if (rows.isEmpty()) {
+            return null;
+        }
+        boolean owned = rows.stream().anyMatch((row) ->
+                row.getCourse() != null
+                        && enrollments.existsByUserIdAndCourseId(account.getId(), row.getCourse().getId()));
+        if (owned) {
+            return null;
+        }
+        cart.setStatus("ACTIVE");
+        return carts.save(cart);
     }
 
     private user requireShopper(String authorization) {

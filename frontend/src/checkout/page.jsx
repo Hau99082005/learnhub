@@ -8,7 +8,6 @@ import {
   confirmCheckout,
   createCheckout,
   getCheckout,
-  getCurrentCheckout,
 } from "@/lib/checkout";
 import { addOwnedMany } from "@/lib/courseAccess";
 import { getCart, loadCart } from "@/lib/cart";
@@ -475,17 +474,14 @@ function CheckoutStart() {
     }
   };
 
-  const submit = async (coupon) => {
-    if (startedRef.current) {
+  const submit = async () => {
+    if (startedRef.current || submitting) {
       return;
     }
     startedRef.current = true;
     setSubmitting(true);
     try {
-      const order = await createCheckout(
-        provider,
-        coupon || quote?.code || couponInput.trim(),
-      );
+      const order = await createCheckout(provider, quote?.code || couponInput.trim());
       if (isPaid(order)) {
         toast.message("Bạn đã sở hữu khóa học trong đơn này");
         window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
@@ -515,15 +511,16 @@ function CheckoutStart() {
   }, []);
 
   useEffect(() => {
-    const preset = couponInput.trim();
-    if (!preset || !ready) {
+    const preset = new URLSearchParams(window.location.search).get("coupon") || "";
+    if (!preset.trim() || !ready) {
       return;
     }
     let cancelled = false;
-    previewCoupon(preset)
+    previewCoupon(preset.trim())
       .then((data) => {
         if (!cancelled) {
           setQuote(data);
+          setCouponInput(data.code || preset.trim().toUpperCase());
         }
       })
       .catch(() => {
@@ -535,40 +532,6 @@ function CheckoutStart() {
       cancelled = true;
     };
   }, [ready]);
-
-  useEffect(() => {
-    const rows = Array.isArray(cart.items) ? cart.items : [];
-    if (rows.length) {
-      const coupon =
-        quote?.code ||
-        new URLSearchParams(window.location.search).get("coupon") ||
-        "";
-      void submit(coupon);
-      return undefined;
-    }
-    if (!ready || startedRef.current) {
-      return undefined;
-    }
-    let cancelled = false;
-    getCurrentCheckout()
-      .then((order) => {
-        if (cancelled || !order || isPaid(order) || startedRef.current) {
-          return;
-        }
-        startedRef.current = true;
-        setSubmitting(true);
-        if (submitSePayGateway(order)) {
-          return;
-        }
-        if (order.orderCode) {
-          window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [cart, ready]);
 
   if (!items.length) {
     if (!ready || submitting) {
@@ -678,10 +641,22 @@ function CheckoutStart() {
               {applying ? "Đang áp..." : "Áp dụng"}
             </button>
           </div>
+          {quote?.code ? (
+            <p className="mt-2 text-sm text-emerald-500" style={fieldStyle}>
+              Đã áp dụng mã {quote.code}
+              {Number(quote.discountAmount) > 0
+                ? `, giảm ${formatMoney(quote.discountAmount, cart.currency)}`
+                : ""}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground" style={fieldStyle}>
+              Nhập mã giảm giá rồi bấm Áp dụng trước khi thanh toán, nếu có.
+            </p>
+          )}
           <button
             type="button"
             disabled={submitting}
-            onClick={submit}
+            onClick={() => void submit()}
             className="mt-5 inline-flex h-11 w-full items-center justify-center bg-violet-700 text-sm font-medium text-white transition hover:bg-violet-600 disabled:opacity-70 sm:w-auto sm:px-8"
             style={{
               border: "none",
@@ -727,7 +702,6 @@ function CheckoutOrder({ orderCode }) {
   const [error, setError] = useState("");
   const paidRef = useRef(false);
   const noticeRef = useRef(false);
-  const openedRef = useRef(false);
   const seenPendingRef = useRef(false);
 
   useEffect(() => {
@@ -743,21 +717,6 @@ function CheckoutOrder({ orderCode }) {
       toast.error("Thanh toán chưa hoàn tất");
     }
   }, []);
-
-  useEffect(() => {
-    if (!order || isPaid(order) || openedRef.current) {
-      return;
-    }
-    const result = paymentQuery();
-    if (result === "success" || result === "cancel" || result === "error") {
-      return;
-    }
-    if (!order.gateway?.action) {
-      return;
-    }
-    openedRef.current = true;
-    submitSePayGateway(order);
-  }, [order]);
 
   useEffect(() => {
     if (!orderCode) {
@@ -861,6 +820,13 @@ function CheckoutOrder({ orderCode }) {
               >
                 Tiếp tục thanh toán
               </button>
+              <a
+                href="/thanh-toan"
+                className="inline-flex h-11 w-full items-center justify-center border border-border px-4 text-sm font-medium transition hover:bg-muted sm:w-auto"
+                style={{ borderRadius: "5px" }}
+              >
+                Quay lại áp mã giảm giá
+              </a>
             </div>
           ) : null}
         </div>

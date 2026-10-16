@@ -100,6 +100,8 @@ public class InboxService {
         String href = "/thong-bao";
         if ("PAYMENT".equalsIgnoreCase(row.getType())) {
             href = "/hoc-tap";
+        } else if ("PRACTICE".equalsIgnoreCase(row.getType())) {
+            href = "/hoc-tap?tab=practice";
         } else if (("CERTIFICATE".equalsIgnoreCase(row.getType())
                 || "CERTIFICATE_GRADE".equalsIgnoreCase(row.getType()))
                 && row.getReferenceId() != null) {

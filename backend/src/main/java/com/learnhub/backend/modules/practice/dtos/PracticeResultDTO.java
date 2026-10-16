@@ -5,7 +5,8 @@ import java.util.List;
 
 public class PracticeResultDTO {
     private final Long attemptId;
-    private final BigDecimal score;
+    private final Long courseId;
+     private final BigDecimal score;
     private final boolean passed;
     private final String grade;
     private final String gradeLabel;
@@ -15,6 +16,7 @@ public class PracticeResultDTO {
 
     public PracticeResultDTO(
             Long attemptId,
+            Long courseId,
             BigDecimal score,
             boolean passed,
             String grade,
@@ -23,6 +25,7 @@ public class PracticeResultDTO {
             int total,
             List<PracticeQuestionDTO> questions) {
         this.attemptId = attemptId;
+        this.courseId = courseId;
         this.score = score;
         this.passed = passed;
         this.grade = grade;
@@ -34,6 +37,10 @@ public class PracticeResultDTO {
 
     public Long getAttemptId() {
         return attemptId;
+    }
+
+    public Long getCourseId() {
+        return courseId;
     }
 
     public BigDecimal getScore() {

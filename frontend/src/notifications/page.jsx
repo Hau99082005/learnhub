@@ -3,6 +3,7 @@ import {
   Award,
   Bell,
   CheckCheck,
+  ClipboardList,
   Copy,
   Gift,
   Receipt,
@@ -59,6 +60,9 @@ function iconOf(type) {
   }
   if (type === "CERTIFICATE" || type === "CERTIFICATE_GRADE") {
     return Award;
+  }
+  if (type === "PRACTICE") {
+    return ClipboardList;
   }
   return Bell;
 }
@@ -241,6 +245,8 @@ const NotificationsPage = () => {
                               ? "Vào học tập"
                               : item.type === "CERTIFICATE" || item.type === "CERTIFICATE_GRADE"
                                 ? "Xem chứng chỉ"
+                                : item.type === "PRACTICE"
+                                  ? "Xem lịch sử bài tập"
                               : "Xem chi tiết"}
                         </a>
                       </div>

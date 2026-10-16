@@ -14,7 +14,8 @@ import {
 import { toast } from "sonner";
 import { gradeMeta } from "@/lib/certificate";
 import { getAuthUser } from "@/lib/auth";
-import { getPracticeQuiz, listPractice, submitPractice } from "@/lib/practice";
+import { markAccessed, recordStreakVisit } from "@/lib/learning";
+import { formatPracticeAt, getPracticeQuiz, listPractice, listPracticeHistory, submitPractice } from "@/lib/practice";
 import { cn } from "@/lib/utils";
 
 const FACE = {
@@ -81,15 +82,17 @@ const PracticePage = ({ slug }) => {
 
 function PracticeList() {
   const [items, setItems] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let live = true;
-    listPractice()
-      .then((data) => {
+    Promise.all([listPractice(), listPracticeHistory().catch(() => [])])
+      .then(([data, rows]) => {
         if (live) {
           setItems(Array.isArray(data) ? data : []);
+          setHistory(Array.isArray(rows) ? rows : []);
         }
       })
       .catch((err) => {
@@ -241,8 +244,83 @@ function PracticeList() {
           );
         })}
       </div>
+      {!loading && history.length ? (
+        <div className="mt-10">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 style={{ ...FACE, fontSize: "20px", fontWeight: 600 }}>Lịch sử làm bài</h2>
+              <p className="mt-1 text-muted-foreground" style={{ ...FACE, fontSize: "14px" }}>
+                Kết quả đã lưu vào cơ sở dữ liệu và lịch sử học tập.
+              </p>
+            </div>
+            <a
+              href="/hoc-tap?tab=practice"
+              className="text-violet-400 transition hover:text-violet-300"
+              style={{ ...FACE, fontSize: "13px", fontWeight: 600 }}
+            >
+              Xem trong Học tập
+            </a>
+          </div>
+          <div className="space-y-3">
+            {history.map((row) => (
+              <HistoryRow key={row.attemptId} row={row} />
+            ))}
+          </div>
+        </div>
+      ) : null}
       <style>{MOTION}</style>
     </section>
+  );
+}
+
+function HistoryRow({ row }) {
+  const score = scoreOf(row.score);
+  const meta = row.grade ? gradeMeta(row.grade, score) : null;
+  return (
+    <article
+      className="flex flex-col gap-3 border border-border/80 bg-card p-3 sm:flex-row sm:items-center sm:p-4"
+      style={{ borderRadius: "5px" }}
+    >
+      {row.images ? (
+        <img
+          src={row.images}
+          alt=""
+          className="h-16 w-full object-cover sm:h-16 sm:w-28"
+          style={{ borderRadius: "5px" }}
+        />
+      ) : (
+        <span
+          className="flex h-16 w-full items-center justify-center bg-violet-700/20 text-violet-300 sm:w-28"
+          style={{ borderRadius: "5px" }}
+        >
+          <ClipboardList className="size-6" />
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <h3 className="line-clamp-2" style={{ ...FACE, fontSize: "15px", fontWeight: 600 }}>
+          {row.title}
+        </h3>
+        <p className="mt-1 text-muted-foreground" style={{ ...FACE, fontSize: "13px" }}>
+          {formatPracticeAt(row.submittedAt)}
+          {row.total ? ` · Đúng ${row.correctCount}/${row.total} câu` : ""}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        {meta ? (
+          <span className={cn("px-2 py-0.5", meta.badge)} style={{ ...FACE, fontSize: "11px", fontWeight: 600, borderRadius: "5px" }}>
+            {row.gradeLabel}
+          </span>
+        ) : null}
+        <span style={{ ...FACE, fontSize: "14px", fontWeight: 600 }}>{Math.round(score)} điểm</span>
+        <a
+          href={`/bai-tap/${row.slug}`}
+          className="inline-flex h-9 items-center bg-violet-700 px-3 text-white transition hover:bg-violet-600"
+          style={{ ...FACE, fontSize: "13px", borderRadius: "5px" }}
+        >
+          Làm lại
+        </a>
+      </div>
+    </article>
   );
 }
 
@@ -315,7 +393,13 @@ function QuizView({ slug }) {
         slug,
         questions.map((item) => ({ questionId: item.id, optionId: picked[item.id] })),
       );
+      const courseId = data?.courseId || quiz?.courseId;
+      if (courseId) {
+        markAccessed(courseId);
+      }
+      recordStreakVisit();
       setResult(data);
+      toast.success("Đã lưu kết quả vào lịch sử học tập");
     } catch (err) {
       toast.error(err.message || "Không nộp được bài");
     } finally {
@@ -404,6 +488,9 @@ function QuizView({ slug }) {
               <p className="mt-1 text-muted-foreground" style={{ ...FACE, fontSize: "13px" }}>
                 Cần {quiz.passScore} điểm để đạt. {result.passed ? "Bạn đã vượt mức đạt." : "Hãy xem lại bài giảng rồi làm lại."}
               </p>
+              <p className="mt-2 text-emerald-400" style={{ ...FACE, fontSize: "13px", fontWeight: 600 }}>
+                Đã lưu vào lịch sử học tập
+              </p>
             </div>
           </div>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row">
@@ -416,6 +503,14 @@ function QuizView({ slug }) {
               <RotateCcw className="size-4" />
               Làm lại
             </button>
+            <a
+              href="/hoc-tap?tab=practice"
+              className="inline-flex h-11 items-center justify-center gap-1.5 border border-border px-4 transition hover:bg-muted"
+              style={{ ...FACE, fontSize: "14px", borderRadius: "5px" }}
+            >
+              <ClipboardList className="size-4" />
+              Lịch sử học tập
+            </a>
             <a
               href={`/hoc/${slug}`}
               className="inline-flex h-11 items-center justify-center gap-1.5 border border-border px-4 transition hover:bg-muted"

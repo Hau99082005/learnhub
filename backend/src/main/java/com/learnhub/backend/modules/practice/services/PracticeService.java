@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.learnhub.backend.modules.cart.models.Enrollment;
 import com.learnhub.backend.modules.cart.repositories.EnrollmentRepository;
@@ -30,6 +32,7 @@ import com.learnhub.backend.modules.instructor.models.Course;
 import com.learnhub.backend.modules.instructor.repositories.CourseRepository;
 import com.learnhub.backend.modules.practice.dtos.PracticeAnswerRequest;
 import com.learnhub.backend.modules.practice.dtos.PracticeCourseDTO;
+import com.learnhub.backend.modules.practice.dtos.PracticeHistoryDTO;
 import com.learnhub.backend.modules.practice.dtos.PracticeOptionDTO;
 import com.learnhub.backend.modules.practice.dtos.PracticeQuestionDTO;
 import com.learnhub.backend.modules.practice.dtos.PracticeQuizDTO;
@@ -46,6 +49,8 @@ import com.learnhub.backend.modules.practice.repositories.QuizOptionRepository;
 import com.learnhub.backend.modules.practice.repositories.QuizQuestionRepository;
 import com.learnhub.backend.modules.practice.repositories.QuizRepository;
 import com.learnhub.backend.modules.practice.support.PracticeTopics;
+import com.learnhub.backend.modules.notify.models.NotificationJob;
+import com.learnhub.backend.modules.notify.services.NotificationQueue;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
 import com.learnhub.backend.modules.user.models.user;
 import com.learnhub.backend.modules.user.services.interfaces.UserServicesInterfaces;
@@ -67,6 +72,7 @@ public class PracticeService {
     private final QuizAttemptRepository attempts;
     private final QuizAttemptAnswerRepository attemptAnswers;
     private final UserServicesInterfaces userServices;
+    private final NotificationQueue notificationQueue;
 
     public PracticeService(
             EnrollmentRepository enrollments,
@@ -78,7 +84,8 @@ public class PracticeService {
             QuizOptionRepository options,
             QuizAttemptRepository attempts,
             QuizAttemptAnswerRepository attemptAnswers,
-            UserServicesInterfaces userServices) {
+            UserServicesInterfaces userServices,
+            NotificationQueue notificationQueue) {
         this.enrollments = enrollments;
         this.courses = courses;
         this.sections = sections;
@@ -89,6 +96,7 @@ public class PracticeService {
         this.attempts = attempts;
         this.attemptAnswers = attemptAnswers;
         this.userServices = userServices;
+        this.notificationQueue = notificationQueue;
     }
 
     @Transactional
@@ -137,6 +145,7 @@ public class PracticeService {
         String gradeLabel = best == null ? "" : CertificateGrades.label(CertificateGrades.of(bestScore));
         return new PracticeQuizDTO(
                 context.quiz.getId(),
+                context.course.getId(),
                 context.quiz.getTitle(),
                 context.quiz.getDescription(),
                 context.course.getTitle(),
@@ -213,10 +222,29 @@ public class PracticeService {
         boolean passed = score.compareTo(BigDecimal.valueOf(passScore)) >= 0;
         saved.setScore(score);
         saved.setPassed(passed);
+        saved.setCorrectCount(correctCount);
+        saved.setTotalQuestions(rows.size());
         attempts.save(saved);
+        context.enrollment.setUpdatedAt(LocalDateTime.now());
+        enrollments.save(context.enrollment);
         String grade = CertificateGrades.of(score);
+        String courseTitle = context.course.getTitle();
+        Long userId = context.account.getId();
+        Long attemptId = saved.getId();
+        int storedCorrect = correctCount;
+        int storedTotal = rows.size();
+        afterCommit(() -> notificationQueue.enqueue(new NotificationJob(
+                userId,
+                "Đã lưu kết quả bài tập",
+                "Bạn đạt " + score.stripTrailingZeros().toPlainString() + " điểm ("
+                        + storedCorrect + "/" + storedTotal + ") khóa \"" + courseTitle
+                        + "\". Kết quả đã được ghi vào lịch sử học tập.",
+                "PRACTICE",
+                "PRACTICE",
+                attemptId)));
         return new PracticeResultDTO(
                 saved.getId(),
+                context.course.getId(),
                 score,
                 passed,
                 grade,
@@ -224,6 +252,53 @@ public class PracticeService {
                 correctCount,
                 rows.size(),
                 review);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PracticeHistoryDTO> history(String authorization) {
+        user account = userServices.requireAccount(authorization);
+        List<QuizAttempt> rows = attempts.findByUserIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(account.getId());
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        List<Long> quizIds = rows.stream().map(QuizAttempt::getQuizId).distinct().toList();
+        Map<Long, Quiz> quizMap = quizzes.findAllById(quizIds).stream()
+                .collect(Collectors.toMap(Quiz::getId, Function.identity(), (left, right) -> left));
+        List<Long> lessonIds = quizMap.values().stream().map(Quiz::getLessonId).distinct().toList();
+        Map<Long, Course> courseByLesson = new HashMap<>();
+        if (!lessonIds.isEmpty()) {
+            for (Lesson lesson : lessons.findWithCourseByIdIn(lessonIds)) {
+                if (lesson.getSection() != null && lesson.getSection().getCourse() != null) {
+                    courseByLesson.put(lesson.getId(), lesson.getSection().getCourse());
+                }
+            }
+        }
+        List<PracticeHistoryDTO> items = new ArrayList<>();
+        for (QuizAttempt row : rows) {
+            Quiz quiz = quizMap.get(row.getQuizId());
+            Course course = quiz == null ? null : courseByLesson.get(quiz.getLessonId());
+            if (course == null || course.getDeletedAt() != null) {
+                continue;
+            }
+            BigDecimal score = row.getScore() == null ? BigDecimal.ZERO : row.getScore();
+            String grade = CertificateGrades.of(score);
+            int total = row.getTotalQuestions() == null ? 0 : row.getTotalQuestions();
+            int correct = row.getCorrectCount() == null ? 0 : row.getCorrectCount();
+            items.add(new PracticeHistoryDTO(
+                    row.getId(),
+                    course.getId(),
+                    course.getSlug(),
+                    course.getTitle(),
+                    course.getImages(),
+                    score,
+                    Boolean.TRUE.equals(row.getPassed()),
+                    grade,
+                    CertificateGrades.label(grade),
+                    correct,
+                    total,
+                    row.getSubmittedAt()));
+        }
+        return items;
     }
 
     private Context open(String authorization, String slug) {
@@ -279,9 +354,10 @@ public class PracticeService {
     private void rebuildQuestions(Course course, Quiz quiz) {
         List<QuizQuestion> existing = questions.findByQuizIdOrderBySortOrderAscIdAsc(quiz.getId());
         if (!existing.isEmpty()) {
-            attempts.deleteByQuizId(quiz.getId());
-            attempts.flush();
-            options.deleteByQuestionIdIn(existing.stream().map(QuizQuestion::getId).toList());
+            List<Long> questionIds = existing.stream().map(QuizQuestion::getId).toList();
+            attemptAnswers.deleteByQuestionIdIn(questionIds);
+            attemptAnswers.flush();
+            options.deleteByQuestionIdIn(questionIds);
             options.flush();
             questions.deleteByQuizId(quiz.getId());
             questions.flush();
@@ -574,6 +650,19 @@ public class PracticeService {
 
     private String norm(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private record Context(user account, Course course, Enrollment enrollment, Quiz quiz) {

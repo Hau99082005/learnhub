@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.learnhub.backend.modules.practice.dtos.PracticeCourseDTO;
+import com.learnhub.backend.modules.practice.dtos.PracticeHistoryDTO;
 import com.learnhub.backend.modules.practice.dtos.PracticeQuizDTO;
 import com.learnhub.backend.modules.practice.dtos.PracticeResultDTO;
 import com.learnhub.backend.modules.practice.dtos.PracticeSubmitRequest;
@@ -30,6 +31,12 @@ public class PracticeController {
     public ResponseEntity<List<PracticeCourseDTO>> list(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         return ResponseEntity.ok(practiceService.list(authorization));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<PracticeHistoryDTO>> history(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(practiceService.history(authorization));
     }
 
     @GetMapping("/{slug}")

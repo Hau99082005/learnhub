@@ -69,4 +69,12 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
             order by l.id desc
             """)
     List<String> recentTitlesOutsideCourse(@Param("courseId") Long courseId, Pageable pageable);
+
+    @Query("""
+            select l from Lesson l
+            join fetch l.section s
+            join fetch s.course c
+            where l.id in :ids
+            """)
+    List<Lesson> findWithCourseByIdIn(@Param("ids") Collection<Long> ids);
 }

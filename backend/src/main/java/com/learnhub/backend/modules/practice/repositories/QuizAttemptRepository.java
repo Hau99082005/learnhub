@@ -17,5 +17,5 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
 
     long countByQuizIdAndUserIdAndSubmittedAtIsNotNull(Long quizId, Long userId);
 
-    void deleteByQuizId(Long quizId);
+    List<QuizAttempt> findByUserIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(Long userId);
 }

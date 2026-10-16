@@ -43,6 +43,12 @@ public class QuizAttempt {
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
+    @Column(name = "correct_count")
+    private Integer correctCount;
+
+    @Column(name = "total_questions")
+    private Integer totalQuestions;
+
     @PrePersist
     protected void onCreate() {
         if (startedAt == null) {
@@ -118,5 +124,21 @@ public class QuizAttempt {
 
     public void setSubmittedAt(LocalDateTime submittedAt) {
         this.submittedAt = submittedAt;
+    }
+
+    public Integer getCorrectCount() {
+        return correctCount;
+    }
+
+    public void setCorrectCount(Integer correctCount) {
+        this.correctCount = correctCount;
+    }
+
+    public Integer getTotalQuestions() {
+        return totalQuestions;
+    }
+
+    public void setTotalQuestions(Integer totalQuestions) {
+        this.totalQuestions = totalQuestions;
     }
 }

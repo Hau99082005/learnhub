@@ -5,6 +5,7 @@ import java.util.List;
 
 public class PracticeQuizDTO {
     private final Long quizId;
+    private final Long courseId;
     private final String title;
     private final String description;
     private final String courseTitle;
@@ -18,6 +19,7 @@ public class PracticeQuizDTO {
 
     public PracticeQuizDTO(
             Long quizId,
+            Long courseId,
             String title,
             String description,
             String courseTitle,
@@ -29,6 +31,7 @@ public class PracticeQuizDTO {
             String gradeLabel,
             List<PracticeQuestionDTO> questions) {
         this.quizId = quizId;
+        this.courseId = courseId;
         this.title = title;
         this.description = description;
         this.courseTitle = courseTitle;
@@ -43,6 +46,10 @@ public class PracticeQuizDTO {
 
     public Long getQuizId() {
         return quizId;
+    }
+
+    public Long getCourseId() {
+        return courseId;
     }
 
     public String getTitle() {

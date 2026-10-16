@@ -5,6 +5,7 @@ import {
   BookOpen,
   Check,
   ChevronDown,
+  ClipboardList,
   Clock,
   Flame,
   FolderPlus,
@@ -21,7 +22,7 @@ import {
 import { toast } from "sonner";
 import { CertificateCard, CertificateTrackCard } from "@/certificate/CertificateView";
 import { CourseCard, formatDuration, LEVELS } from "@/components/Course";
-import { CERT_PASS, CERT_SCALE, gradeOf } from "@/lib/certificate";
+import { CERT_PASS, CERT_SCALE, gradeMeta, gradeOf } from "@/lib/certificate";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,6 +44,7 @@ import {
   recordStreakVisit,
   setArchived,
 } from "@/lib/learning";
+import { formatPracticeAt, listPracticeHistory } from "@/lib/practice";
 import { cn } from "@/lib/utils";
 import {
   getWishlistItems,
@@ -56,6 +58,7 @@ const TABS = [
   { id: "lists", label: "Danh sách của tôi" },
   { id: "wishlist", label: "Danh sách mong ước" },
   { id: "certs", label: "Chứng chỉ" },
+  { id: "practice", label: "Bài tập" },
   { id: "archived", label: "Đã lưu trữ" },
   { id: "tools", label: "Công cụ học tập" },
 ];
@@ -283,6 +286,8 @@ const LearningPage = () => {
   const [lists, setLists] = useState(() => getLists());
   const [listName, setListName] = useState("");
   const [streak, setStreak] = useState(() => getStreak());
+  const [practiceHistory, setPracticeHistory] = useState([]);
+  const [practiceLoading, setPracticeLoading] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -330,6 +335,33 @@ const LearningPage = () => {
     };
   }, [user, query]);
 
+  useEffect(() => {
+    if (!user || tab !== "practice") {
+      return undefined;
+    }
+    let cancelled = false;
+    setPracticeLoading(true);
+    listPracticeHistory()
+      .then((data) => {
+        if (!cancelled) {
+          setPracticeHistory(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          toast.error(err.message || "Không tải được lịch sử bài tập");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPracticeLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, tab]);
+
   const tabPool = useMemo(() => {
     if (tab === "wishlist") {
       return wishItems;
@@ -340,7 +372,7 @@ const LearningPage = () => {
       if (tab === "archived") {
         return isArchived;
       }
-      if (isArchived || tab === "lists" || tab === "tools") {
+      if (isArchived || tab === "lists" || tab === "tools" || tab === "practice") {
         return false;
       }
       return true;
@@ -787,7 +819,106 @@ const LearningPage = () => {
           </div>
         ) : null}
 
-        {tab !== "lists" && tab !== "tools" ? (
+        {tab === "practice" ? (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2
+                  className="text-lg font-semibold tracking-tight"
+                  style={{ fontFamily: "Roboto", fontSize: "20px", fontWeight: 700 }}
+                >
+                  Lịch sử bài tập
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Mỗi lần nộp quiz được lưu vào cơ sở dữ liệu và hiện tại đây.
+                </p>
+              </div>
+              <a
+                href="/bai-tap"
+                className={cn(
+                  buttonVariants({ variant: "default" }),
+                  "h-10 bg-violet-700 text-white hover:bg-violet-800",
+                )}
+                style={{ borderRadius: "5px" }}
+              >
+                Làm bài tập
+              </a>
+            </div>
+            {practiceLoading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="h-24 animate-pulse bg-muted/70" style={{ borderRadius: "5px" }} />
+                ))}
+              </div>
+            ) : practiceHistory.length === 0 ? (
+              <div className="border border-dashed border-border px-4 py-12 text-center" style={{ borderRadius: "5px" }}>
+                <ClipboardList className="mx-auto size-10 text-muted-foreground" />
+                <p className="mt-3 font-medium">Chưa có bài làm nào</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Vào Bài tập, làm quiz theo khóa đang học, kết quả sẽ xuất hiện tại đây.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {practiceHistory.map((row) => {
+                  const score = Number(row.score);
+                  const amount = Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
+                  const meta = row.grade ? gradeMeta(row.grade, amount) : null;
+                  return (
+                    <article
+                      key={row.attemptId}
+                      className="flex flex-col gap-3 border border-border bg-card p-3 sm:flex-row sm:items-center sm:p-4"
+                      style={{ borderRadius: "5px" }}
+                    >
+                      {row.images ? (
+                        <img
+                          src={row.images}
+                          alt=""
+                          className="h-20 w-full object-cover sm:h-16 sm:w-28"
+                          style={{ borderRadius: "5px" }}
+                        />
+                      ) : (
+                        <span
+                          className="flex h-20 w-full items-center justify-center bg-violet-700/15 text-violet-600 sm:h-16 sm:w-28 dark:text-violet-300"
+                          style={{ borderRadius: "5px" }}
+                        >
+                          <ClipboardList className="size-6" />
+                        </span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h3 className="line-clamp-2 text-[15px] font-semibold">{row.title}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {formatPracticeAt(row.submittedAt)}
+                          {row.total ? ` · Đúng ${row.correctCount}/${row.total} câu` : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        {meta ? (
+                          <span
+                            className={cn("px-2 py-0.5 text-[11px] font-semibold", meta.badge)}
+                            style={{ borderRadius: "5px" }}
+                          >
+                            {row.gradeLabel}
+                          </span>
+                        ) : null}
+                        <span className="text-sm font-semibold">{Math.round(amount)} điểm</span>
+                        <a
+                          href={`/bai-tap/${row.slug}`}
+                          className="inline-flex h-9 items-center bg-violet-700 px-3 text-sm text-white hover:bg-violet-600"
+                          style={{ borderRadius: "5px" }}
+                        >
+                          Làm lại
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {tab !== "lists" && tab !== "tools" && tab !== "practice" ? (
           <>
             <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap items-center gap-2">

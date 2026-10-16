@@ -4,6 +4,7 @@ import {
   BookOpen,
   Bot,
   CircleHelp,
+  ClipboardList,
   GraduationCap,
   RotateCcw,
   Send,
@@ -54,6 +55,12 @@ const TABS = [
     label: "Học tập",
     icon: BookOpen,
     hints: ["Khóa tôi đang học", "Tiến độ học của tôi", "Vào trang học tập thế nào?"],
+  },
+  {
+    id: "bai-tap",
+    label: "Bài tập",
+    icon: ClipboardList,
+    hints: ["Bài tập đánh giá năng lực ở đâu?", "Quiz khóa đang học làm thế nào?", "Điểm bài tập tính ra sao?"],
   },
   {
     id: "thanh-toan",

@@ -221,6 +221,7 @@ function UserMenu({ user, cartItems = 0, wishItems = 0, unread = 0 }) {
         ) : null}
         <DropdownMenuSeparator />
         <UserMenuLink href="/hoc-tap">Học tập</UserMenuLink>
+        <UserMenuLink href="/bai-tap">Bài tập</UserMenuLink>
         <DropdownMenuSeparator />
         <UserMenuLink href="/gio-hang" count={cartItems}>
           Giỏ hàng của tôi
@@ -506,21 +507,40 @@ const Header = () => {
                   );
                 })}
                 {user ? (
-                  <li>
-                    <SheetClose
-                      render={
-                        <a
-                          href="/hoc-tap"
-                          className={cn(
-                            "flex h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                            path === "/hoc-tap" && "bg-muted text-foreground",
-                          )}
-                        />
-                      }
-                    >
-                      Học tập
-                    </SheetClose>
-                  </li>
+                  <>
+                    <li>
+                      <SheetClose
+                        render={
+                          <a
+                            href="/hoc-tap"
+                            className={cn(
+                              "flex h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                              path === "/hoc-tap" && "bg-muted text-foreground",
+                            )}
+                          />
+                        }
+                      >
+                        Học tập
+                      </SheetClose>
+                    </li>
+                    <li>
+                      <SheetClose
+                        render={
+                          <a
+                            href="/bai-tap"
+                            className={cn(
+                              "flex h-11 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                              path === "/bai-tap" || path.startsWith("/bai-tap/")
+                                ? "bg-muted text-foreground"
+                                : "",
+                            )}
+                          />
+                        }
+                      >
+                        Bài tập
+                      </SheetClose>
+                    </li>
+                  </>
                 ) : null}
                 {isInstructor(user) ? (
                   <li>
@@ -609,12 +629,20 @@ const Header = () => {
 
         <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
           {user ? (
-            <a
-              href="/hoc-tap"
-              className="hidden h-10 items-center px-2 text-sm font-medium text-foreground transition-colors hover:text-violet-700 lg:inline-flex"
-            >
-              Học tập
-            </a>
+            <>
+              <a
+                href="/hoc-tap"
+                className="hidden h-10 items-center px-2 text-sm font-medium text-foreground transition-colors hover:text-violet-700 lg:inline-flex"
+              >
+                Học tập
+              </a>
+              <a
+                href="/bai-tap"
+                className="hidden h-10 items-center px-2 text-sm font-medium text-foreground transition-colors hover:text-violet-700 lg:inline-flex"
+              >
+                Bài tập
+              </a>
+            </>
           ) : null}
           {isInstructor(user) ? (
             <a

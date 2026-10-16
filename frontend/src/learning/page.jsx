@@ -724,19 +724,24 @@ const LearningPage = () => {
               },
               {
                 icon: Wrench,
-                title: "Tài nguyên khóa học",
-                text: "Mở khóa học đã mua để tải tài liệu và xem bài tập.",
+                title: "Bài tập đánh giá năng lực",
+                text: "Làm quiz theo bài giảng khóa đang học để biết mức độ nắm kiến thức.",
+                href: "/bai-tap",
               },
-            ].map((tool) => (
-              <div
-                key={tool.title}
-                className="rounded-2xl border border-border p-5 transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <tool.icon className="size-6 text-violet-700" />
-                <h2 className="mt-3 text-base font-semibold">{tool.title}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{tool.text}</p>
-              </div>
-            ))}
+            ].map((tool) => {
+              const Box = tool.href ? "a" : "div";
+              return (
+                <Box
+                  key={tool.title}
+                  href={tool.href}
+                  className="rounded-2xl border border-border p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <tool.icon className="size-6 text-violet-700" />
+                  <h2 className="mt-3 text-base font-semibold">{tool.title}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{tool.text}</p>
+                </Box>
+              );
+            })}
           </div>
         ) : null}
 

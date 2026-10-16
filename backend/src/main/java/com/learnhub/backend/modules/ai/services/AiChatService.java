@@ -219,7 +219,8 @@ public class AiChatService {
         prompt.append("Hệ thống sẽ hiện thẻ khóa học kèm ảnh, chỉ viết lời giới thiệu rồi mời bấm thẻ. ");
         prompt.append("Nêu bước tiếp theo rõ ràng khi phù hợp.\n");
         prompt.append("Thanh toán: /thanh-toan chuyển khoản SePay, mở khóa ngay khi thành công. ");
-        prompt.append("Chứng chỉ: xem video đủ 50% trở lên, điểm theo % xem, trang /hoc-tap.\n\n");
+        prompt.append("Chứng chỉ: xem video đủ 50% trở lên, điểm theo % xem, trang /hoc-tap. ");
+        prompt.append("Bài tập: quiz đánh giá năng lực theo bài giảng khóa đang học, trang /bai-tap.\n\n");
         prompt.append(facts);
         prompt.append("\nLịch sử:\n");
         for (AiChatMessage row : history) {
@@ -267,6 +268,9 @@ public class AiChatService {
         }
         if (ask.contains("miễn phí") || ask.contains("mien phi")) {
             return "Mình lọc các khóa đang mở cho bạn. Khóa miễn phí sẽ ghi rõ trên thẻ, bấm vào để xem chi tiết.";
+        }
+        if (ask.contains("bài tập") || ask.contains("bai tap") || ask.contains("quiz") || ask.contains("năng lực")) {
+            return "Vào /bai-tap để làm quiz theo bài giảng các khóa bạn đang học. Điểm từ 50 Trung bình, 65 Khá, 80 Giỏi, 90 Xuất sắc.";
         }
         if (ask.contains("learnhub") || ask.contains("dùng để") || ask.contains("là gì")) {
             return "LearnHub là nền tảng học trực tuyến: chọn khóa, thanh toán, học video và nhận chứng chỉ khi xem đủ tiến độ.";

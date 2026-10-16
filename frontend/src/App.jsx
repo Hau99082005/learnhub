@@ -24,6 +24,7 @@ import CoursePlayerPage from "@/learn/page"
 import CertificatePage from "@/certificate/page"
 import NotificationsPage from "@/notifications/page"
 import PaymentMethodsPage from "@/payments/page"
+import PracticePage from "@/practice/page"
 import { Toaster } from "@/components/ui/sonner"
 import { consumePendingToast, getAuthUser, onAuthChange } from "@/lib/auth"
 import { hydrateOwned } from "@/lib/courseAccess"
@@ -158,6 +159,10 @@ function App() {
             <CartPage />
           ) : path === "/hoc-tap" || path === "/danh-sach-mong-uoc" ? (
             <LearningPage />
+          ) : path === "/bai-tap" ? (
+            <PracticePage />
+          ) : path.startsWith("/bai-tap/") && path.split("/").filter(Boolean)[1] ? (
+            <PracticePage slug={decodeURIComponent(path.split("/").filter(Boolean)[1])} />
           ) : path === "/thanh-toan" || path.startsWith("/thanh-toan/") ? (
             <CheckoutPage />
           ) : path === "/lich-su-mua" ? (

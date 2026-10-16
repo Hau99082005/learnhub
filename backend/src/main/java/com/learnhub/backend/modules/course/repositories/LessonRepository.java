@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -39,4 +40,33 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
     boolean existsBySlugAndSectionId(String slug, Long sectionId);
 
     boolean existsBySlugAndSectionIdAndIdNot(String slug, Long sectionId, Long id);
+
+    @Query("""
+            select l from Lesson l
+            join fetch l.section s
+            where s.course.id = :courseId
+              and l.slug = :slug
+            order by l.id asc
+            """)
+    List<Lesson> findByCourseIdAndSlug(@Param("courseId") Long courseId, @Param("slug") String slug);
+
+    @Query("""
+            select l from Lesson l
+            join fetch l.section s
+            where s.course.id = :courseId
+              and l.lessonType = 'VIDEO'
+              and l.isPublished = 1
+            order by s.sortOrder asc, l.sortOrder asc, l.id asc
+            """)
+    List<Lesson> findPublishedVideosByCourseId(@Param("courseId") Long courseId);
+
+    @Query("""
+            select l.title from Lesson l
+            where l.lessonType = 'VIDEO'
+              and l.isPublished = 1
+              and l.section.course.id <> :courseId
+              and l.title is not null
+            order by l.id desc
+            """)
+    List<String> recentTitlesOutsideCourse(@Param("courseId") Long courseId, Pageable pageable);
 }

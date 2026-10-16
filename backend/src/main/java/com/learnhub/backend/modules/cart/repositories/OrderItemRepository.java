@@ -15,6 +15,8 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     @Query("select i from OrderItem i join fetch i.course c left join fetch c.instructor where i.order.id = :orderId order by i.id asc")
     List<OrderItem> findByOrderIdWithCourse(@Param("orderId") Long orderId);
 
+    List<OrderItem> findByOrder_IdInOrderByIdAsc(Collection<Long> orderIds);
+
     @Query("""
             select i from OrderItem i
             join fetch i.order o

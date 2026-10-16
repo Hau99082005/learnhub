@@ -25,6 +25,7 @@ import { AllCategory } from "@/admin/categories/AllCategory";
 import { AllNews } from "@/admin/news/AllNews";
 import { AllNewsBlog } from "@/admin/news/AllNewsBlog";
 import { AllCourse } from "@/admin/courses/AllCourse";
+import { AllOrders } from "@/admin/orders/AllOrders";
 
 const STAT_STYLES = {
   users: "bg-violet-500",
@@ -160,6 +161,7 @@ const Page = () => {
     path === "/admin/courses" ||
     path === "/quan-tri/courses" ||
     /^\/(?:admin|quan-tri)\/courses\/\d+\/phan-hoc$/.test(path);
+  const isOrders = path === "/admin/orders" || path === "/quan-tri/orders";
 
   return (
     <AdminLayout user={admin}>
@@ -173,6 +175,8 @@ const Page = () => {
         <AllNewsBlog />
       ) : isCourses ? (
         <AllCourse />
+      ) : isOrders ? (
+        <AllOrders />
       ) : (
         <DashboardView />
       )}

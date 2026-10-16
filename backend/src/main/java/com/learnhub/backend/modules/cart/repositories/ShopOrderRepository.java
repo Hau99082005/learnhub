@@ -1,5 +1,6 @@
 package com.learnhub.backend.modules.cart.repositories;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -27,4 +28,26 @@ public interface ShopOrderRepository extends JpaRepository<ShopOrder, Long> {
     boolean existsByOrderCode(String orderCode);
 
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(LocalDateTime start, LocalDateTime end);
+
+    @EntityGraph(attributePaths = "user")
+    List<ShopOrder> findTop300ByOrderByIdDesc();
+
+    @Query("select upper(o.status), count(o) from ShopOrder o group by upper(o.status)")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("""
+            select upper(coalesce(u.role, 'USER')), upper(o.status), count(o)
+            from ShopOrder o join o.user u
+            group by upper(coalesce(u.role, 'USER')), upper(o.status)
+            """)
+    List<Object[]> countGroupedByRoleAndStatus();
+
+    @Query("select count(distinct o.user.id) from ShopOrder o")
+    long countDistinctBuyers();
+
+    @Query("select count(distinct o.user.id) from ShopOrder o where upper(o.user.role) = :role")
+    long countDistinctBuyersByRole(@Param("role") String role);
+
+    @Query("select coalesce(sum(o.totalAmount), 0) from ShopOrder o where upper(o.status) = 'PAID'")
+    BigDecimal sumPaidTotal();
 }

@@ -1,26 +1,19 @@
 import { useState } from "react";
 import {
   Bell,
-  Calendar,
-  ChevronDown,
   FileText,
   GraduationCap,
   LayoutDashboard,
   LayoutGrid,
-  ChartLine,
   LogOut,
   Mail,
   Menu,
-  Puzzle,
   Search,
-  Shield,
-  Star,
   Sun,
-  Table2,
-  PanelsTopLeft,
   Images,
   Tags,
   Newspaper,
+  Receipt,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -41,73 +34,49 @@ import logoLearnHub from "@/assets/icons/Logo LearnHub (1)-Photoroom.png";
 
 const NAV_GROUPS = [
   {
-    title: "Core",
+    title: "Tổng quan",
     items: [
       {
         href: "/quan-tri",
         label: "Dashboard",
         icon: LayoutDashboard,
-        badge: "NEW",
       },
     ],
   },
   {
-    title: "UI Elements",
+    title: "Quản lý",
     items: [
       { href: "/admin/banners", label: "Banners", icon: Images },
       { href: "/admin/categories", label: "Danh mục", icon: Tags },
       { href: "/admin/news", label: "Tin nổi bật", icon: Newspaper },
       { href: "/admin/newsblogs", label: "Bài viết", icon: FileText },
       { href: "/admin/courses", label: "Khóa học", icon: GraduationCap },
-      {
-        href: "/quan-tri/thanh-phan",
-        label: "Components",
-        icon: Puzzle,
-        chevron: true,
-      },
-      {
-        href: "/quan-tri/bang-du-lieu",
-        label: "Data Grid",
-        icon: Table2,
-        badge: "ADD-ON",
-        badgeTone: "amber",
-      },
-      { href: "/quan-tri/form", label: "Forms", icon: FileText, chevron: true },
-      { href: "/quan-tri/icon", label: "Icons", icon: Star },
-      {
-        href: "/quan-tri/lich",
-        label: "Scheduler",
-        icon: Calendar,
-        badge: "ADD-ON",
-        badgeTone: "amber",
-      },
-      {
-        href: "/quan-tri/bang",
-        label: "Smart Table",
-        icon: Table2,
-        badge: "PRO",
-        badgeTone: "rose",
-      },
-      {
-        href: "/quan-tri/widget",
-        label: "Widgets",
-        icon: PanelsTopLeft,
-        badge: "NEW",
-      },
-    ],
-  },
-  {
-    title: "Extras",
-    items: [
-      {
-        href: "/quan-tri/xac-thuc",
-        label: "Authentication",
-        icon: Shield,
-        chevron: true,
-      },
+      { href: "/admin/orders", label: "Đơn hàng", icon: Receipt },
     ],
   },
 ];
+
+function crumbTitle(path) {
+  if (path.includes("/orders")) {
+    return "Đơn hàng";
+  }
+  if (path.includes("/courses")) {
+    return "Khóa học";
+  }
+  if (path.includes("/banners")) {
+    return "Banners";
+  }
+  if (path.includes("/categories")) {
+    return "Danh mục";
+  }
+  if (path.includes("/newsblogs")) {
+    return "Bài viết";
+  }
+  if (path.includes("/news")) {
+    return "Tin nổi bật";
+  }
+  return "Dashboard";
+}
 
 function userInitials(user) {
   const name = user?.fullName?.trim();
@@ -117,21 +86,6 @@ function userInitials(user) {
     return letters.toUpperCase() || "A";
   }
   return (user?.email?.[0] || "A").toUpperCase();
-}
-
-function NavBadge({ label, tone }) {
-  return (
-    <span
-      className={cn(
-        "ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide",
-        tone === "amber" && "bg-amber-400 text-amber-950",
-        tone === "rose" && "bg-rose-500 text-white",
-        !tone && "bg-sky-500 text-white",
-      )}
-    >
-      {label}
-    </span>
-  );
 }
 
 function logout() {
@@ -259,10 +213,16 @@ function Sidebar({ path }) {
             <ul className="grid gap-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
+                const slug = item.href.startsWith("/admin/")
+                  ? item.href.slice("/admin/".length)
+                  : "";
                 const active =
-                  path === item.href ||
-                  (item.href === "/admin/courses" &&
-                    /^\/(?:admin|quan-tri)\/courses(\/|$)/.test(path));
+                  item.href === "/quan-tri"
+                    ? path === "/quan-tri" || path === "/admin"
+                    : path === item.href ||
+                      path === `/quan-tri/${slug}` ||
+                      path.startsWith(`${item.href}/`) ||
+                      path.startsWith(`/quan-tri/${slug}/`);
                 return (
                   <li key={item.href}>
                     <a
@@ -293,12 +253,6 @@ function Sidebar({ path }) {
                       >
                         {item.label}
                       </span>
-                      {item.badge ? (
-                        <NavBadge label={item.badge} tone={item.badgeTone} />
-                      ) : null}
-                      {item.chevron ? (
-                        <ChevronDown className="ml-auto size-3.5" />
-                      ) : null}
                     </a>
                   </li>
                 );
@@ -424,7 +378,7 @@ export default function AdminLayout({ user, children }) {
                   letterSpacing: "0.01em",
                 }}
               >
-                Dashboard
+                {crumbTitle(path)}
               </span>
             </p>
             <p

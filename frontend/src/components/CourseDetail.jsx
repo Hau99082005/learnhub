@@ -518,7 +518,7 @@ function PurchaseCard({ item, onAccessChange }) {
                   return;
                 }
                 onAccessChange?.();
-                window.location.href = "/gio-hang";
+                window.location.href = "/thanh-toan";
               }}
               style={{
                 fontFamily: "'Roboto', sans-serif",

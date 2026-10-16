@@ -4,7 +4,12 @@ import { toast } from "sonner";
 import { formatMoney } from "@/components/Course";
 import { Input } from "@/components/ui/input";
 import { getAuthUser } from "@/lib/auth";
-import { confirmCheckout, createCheckout } from "@/lib/checkout";
+import {
+  confirmCheckout,
+  createCheckout,
+  getCheckout,
+  getCurrentCheckout,
+} from "@/lib/checkout";
 import { addOwnedMany } from "@/lib/courseAccess";
 import { getCart, loadCart } from "@/lib/cart";
 import { previewCoupon } from "@/lib/coupon";
@@ -435,6 +440,7 @@ function PayGuide({ order }) {
 }
 
 function CheckoutStart() {
+  const startedRef = useRef(false);
   const [cart, setCart] = useState(getCart);
   const [ready, setReady] = useState(false);
   const [provider, setProvider] = useState("BANK_TRANSFER");
@@ -444,6 +450,63 @@ function CheckoutStart() {
   );
   const [quote, setQuote] = useState(null);
   const [applying, setApplying] = useState(false);
+
+  const items = Array.isArray(cart.items) ? cart.items : [];
+  const payable = quote ? quote.totalAmount : cart.subtotal;
+  const discount = quote ? quote.discountAmount : 0;
+
+  const applyCode = async () => {
+    const code = couponInput.trim();
+    if (!code) {
+      setQuote(null);
+      return;
+    }
+    setApplying(true);
+    try {
+      const data = await previewCoupon(code);
+      setQuote(data);
+      setCouponInput(data.code || code);
+      toast.success(`Đã áp dụng mã ${data.code}`);
+    } catch (error) {
+      setQuote(null);
+      toast.error(error.message || "Không áp dụng được mã giảm giá");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const submit = async (coupon) => {
+    if (startedRef.current) {
+      return;
+    }
+    startedRef.current = true;
+    setSubmitting(true);
+    try {
+      const order = await createCheckout(
+        provider,
+        coupon || quote?.code || couponInput.trim(),
+      );
+      if (isPaid(order)) {
+        toast.message("Bạn đã sở hữu khóa học trong đơn này");
+        window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
+        return;
+      }
+      if (submitSePayGateway(order)) {
+        return;
+      }
+      if (order?.orderCode) {
+        window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
+        return;
+      }
+      toast.error("Không khởi tạo được thanh toán. Vui lòng thử lại.");
+      startedRef.current = false;
+      setSubmitting(false);
+    } catch (error) {
+      startedRef.current = false;
+      toast.error(error.message || "Không thể tạo đơn thanh toán");
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     loadCart()
@@ -473,66 +536,49 @@ function CheckoutStart() {
     };
   }, [ready]);
 
-  const items = Array.isArray(cart.items) ? cart.items : [];
-  const payable = quote ? quote.totalAmount : cart.subtotal;
-  const discount = quote ? quote.discountAmount : 0;
-
-  const applyCode = async () => {
-    const code = couponInput.trim();
-    if (!code) {
-      setQuote(null);
-      return;
+  useEffect(() => {
+    const rows = Array.isArray(cart.items) ? cart.items : [];
+    if (rows.length) {
+      const coupon =
+        quote?.code ||
+        new URLSearchParams(window.location.search).get("coupon") ||
+        "";
+      void submit(coupon);
+      return undefined;
     }
-    setApplying(true);
-    try {
-      const data = await previewCoupon(code);
-      setQuote(data);
-      setCouponInput(data.code || code);
-      toast.success(`Đã áp dụng mã ${data.code}`);
-    } catch (error) {
-      setQuote(null);
-      toast.error(error.message || "Không áp dụng được mã giảm giá");
-    } finally {
-      setApplying(false);
+    if (!ready || startedRef.current) {
+      return undefined;
     }
-  };
-
-  const submit = async () => {
-    setSubmitting(true);
-    try {
-      const order = await createCheckout(provider, quote?.code || couponInput.trim());
-      await loadCart();
-      if (isPaid(order)) {
-        toast.message("Bạn đã sở hữu khóa học trong đơn này");
-        window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
-        return;
-      }
-      if (submitSePayGateway(order)) {
-        return;
-      }
-      if (order?.orderCode) {
-        window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
-        return;
-      }
-      toast.error("Không khởi tạo được thanh toán. Vui lòng thử lại.");
-      setSubmitting(false);
-    } catch (error) {
-      const message = error.message || "Không thể tạo đơn thanh toán";
-      toast.error(message);
-      setSubmitting(false);
-    }
-  };
-
-  if (!ready) {
-    return (
-      <section className="mx-auto w-full max-w-6xl px-3 py-10 sm:px-6">
-        <div className="h-8 w-48 animate-pulse bg-muted" />
-        <div className="mt-6 h-40 animate-pulse bg-muted" />
-      </section>
-    );
-  }
+    let cancelled = false;
+    getCurrentCheckout()
+      .then((order) => {
+        if (cancelled || !order || isPaid(order) || startedRef.current) {
+          return;
+        }
+        startedRef.current = true;
+        setSubmitting(true);
+        if (submitSePayGateway(order)) {
+          return;
+        }
+        if (order.orderCode) {
+          window.location.href = `/thanh-toan/${encodeURIComponent(order.orderCode)}`;
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [cart, ready]);
 
   if (!items.length) {
+    if (!ready || submitting) {
+      return (
+        <section className="mx-auto w-full max-w-6xl px-3 py-10 sm:px-6">
+          <div className="h-8 w-48 animate-pulse bg-muted" />
+          <div className="mt-6 h-40 animate-pulse bg-muted" />
+        </section>
+      );
+    }
     return (
       <section className="mx-auto w-full max-w-5xl px-3 py-10 sm:px-6 sm:py-14">
         <h1
@@ -647,7 +693,7 @@ function CheckoutStart() {
               letterSpacing: "0.01em",
             }}
           >
-            {submitting ? "Đang tạo đơn..." : "Tiếp tục thanh toán"}
+            {submitting ? "Đang chuyển tới thanh toán..." : "Tiếp tục thanh toán"}
           </button>
           <p
             className="mt-3 text-center text-xs text-muted-foreground italic sm:text-left"
@@ -720,9 +766,11 @@ function CheckoutOrder({ orderCode }) {
     let stopped = false;
     let timer = 0;
     const returning = paymentQuery() === "success";
-    const tick = async () => {
+    const tick = async (checkPay) => {
       try {
-        const next = await confirmCheckout(orderCode);
+        const next = checkPay
+          ? await confirmCheckout(orderCode)
+          : await getCheckout(orderCode);
         if (stopped) {
           return;
         }
@@ -750,8 +798,8 @@ function CheckoutOrder({ orderCode }) {
         }
       }
     };
-    tick();
-    timer = window.setInterval(tick, 2000);
+    tick(returning);
+    timer = window.setInterval(() => tick(true), 2000);
     return () => {
       stopped = true;
       window.clearInterval(timer);

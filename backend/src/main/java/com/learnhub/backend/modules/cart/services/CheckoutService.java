@@ -6,6 +6,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -124,6 +125,13 @@ public class CheckoutService {
                 throw new AuthException(HttpStatus.CONFLICT, "Bạn đã sở hữu một khóa học trong giỏ");
             }
         }
+        String couponCode = request == null ? null : request.getCouponCode();
+        CheckoutDTO reused = reusePendingCheckout(account, rows, couponCode);
+        if (reused != null) {
+            cart.setStatus("CHECKED_OUT");
+            carts.save(cart);
+            return reused;
+        }
         BigDecimal subtotal = rows.stream()
                 .map(item -> item.getUnitPrice() == null ? BigDecimal.ZERO : item.getUnitPrice())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -150,7 +158,6 @@ public class CheckoutService {
             item.setUnitPrice(row.getUnitPrice() == null ? BigDecimal.ZERO : row.getUnitPrice());
             orderItems.save(item);
         }
-        String couponCode = request == null ? null : request.getCouponCode();
         if (couponCode != null && !couponCode.isBlank()) {
             couponService.applyToOrder(order, account.getId(), couponCode, rows);
             orders.saveAndFlush(order);
@@ -165,27 +172,6 @@ public class CheckoutService {
         payment.setProviderTxnId(provider + "-" + order.getOrderCode());
         applyPayee(payment, courseList);
         payments.save(payment);
-        Payee createdPayee = resolvePayee(courseList);
-        if (createdPayee.instructorId() != null
-                && filled(createdPayee.accountNumber())
-                && !filled(createdPayee.sepayAccountId())) {
-            instructorBanks.findByUser_Id(createdPayee.instructorId()).ifPresent((row) -> {
-                sePayTransactions
-                        .ensureLinkedAccount(
-                                row.getBankCode(),
-                                row.getAccountNumber(),
-                                row.getAccountName(),
-                                "GV" + createdPayee.instructorId())
-                        .ifPresent((linked) -> {
-                            row.setSepayAccountId(linked.id());
-                            instructorBanks.save(row);
-                            payment.setPayeeBank(row.getBankCode());
-                            payment.setPayeeAccountNumber(row.getAccountNumber());
-                            payment.setPayeeAccountName(row.getAccountName());
-                            payments.save(payment);
-                        });
-            });
-        }
         cart.setStatus("CHECKED_OUT");
         carts.save(cart);
         return toDto(order, payment);
@@ -197,10 +183,6 @@ public class CheckoutService {
         ShopOrder order = requireOrder(account, orderCode);
         Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId())
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy thanh toán"));
-        if ("PENDING".equalsIgnoreCase(order.getStatus())
-                && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
-            matchFromSePay(order, payment);
-        }
         return toDto(order, payment);
     }
 
@@ -222,10 +204,6 @@ public class CheckoutService {
         ShopOrder order = recent.get(0);
         Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId())
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "Không tìm thấy thanh toán"));
-        if ("PENDING".equalsIgnoreCase(order.getStatus())
-                && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
-            matchFromSePay(order, payment);
-        }
         return toDto(order, payment);
     }
 
@@ -361,14 +339,52 @@ public class CheckoutService {
             }
             if ("PAID".equalsIgnoreCase(order.getStatus())
                     || "PENDING".equalsIgnoreCase(order.getStatus())) {
-                if ("PENDING".equalsIgnoreCase(order.getStatus())
-                        && "BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
-                    matchFromSePay(order, payment);
-                }
                 return toDto(order, payment);
             }
         }
         return null;
+    }
+
+    private CheckoutDTO reusePendingCheckout(user account, List<CartItem> rows, String couponCode) {
+        List<ShopOrder> recent = orders.findTop20ByUser_IdOrderByIdDesc(account.getId());
+        if (recent.isEmpty()) {
+            return null;
+        }
+        ShopOrder order = recent.get(0);
+        if (!"PENDING".equalsIgnoreCase(order.getStatus())) {
+            return null;
+        }
+        Payment payment = payments.findFirstByOrderIdOrderByIdDesc(order.getId()).orElse(null);
+        if (payment == null || !"PENDING".equalsIgnoreCase(payment.getStatus())) {
+            return null;
+        }
+        List<OrderItem> items = orderItems.findByOrderIdWithCourse(order.getId());
+        if (items.size() != rows.size()) {
+            return null;
+        }
+        Set<Long> cartIds = new HashSet<>();
+        for (CartItem row : rows) {
+            if (row.getCourse() == null || row.getCourse().getId() == null) {
+                return null;
+            }
+            cartIds.add(row.getCourse().getId());
+        }
+        Set<Long> orderIds = new HashSet<>();
+        for (OrderItem item : items) {
+            if (item.getCourse() == null || item.getCourse().getId() == null) {
+                return null;
+            }
+            orderIds.add(item.getCourse().getId());
+        }
+        if (!cartIds.equals(orderIds)) {
+            return null;
+        }
+        String wanted = couponCode == null ? "" : couponCode.trim();
+        String have = order.getCoupon() == null ? "" : trimToEmpty(order.getCoupon().getCode());
+        if (!wanted.equalsIgnoreCase(have)) {
+            return null;
+        }
+        return toDto(order, payment);
     }
 
     private void settlePaid(ShopOrder order, Payment payment, String providerTxnId) {
@@ -595,23 +611,12 @@ public class CheckoutService {
             if (saved.isPresent()) {
                 InstructorBankAccount row = saved.get();
                 if (filled(row.getBankCode()) && filled(row.getAccountNumber()) && filled(row.getAccountName())) {
-                    String sepayId = trimToEmpty(row.getSepayAccountId());
-                    if (sepayId.isBlank()) {
-                        sePayTransactions.invalidateBankCache();
-                        Optional<SePayTransactionClient.LinkedAccount> linked =
-                                sePayTransactions.findLinkedAccount(row.getAccountNumber());
-                        if (linked.isPresent()) {
-                            sepayId = linked.get().id();
-                            row.setSepayAccountId(sepayId);
-                            instructorBanks.save(row);
-                        }
-                    }
                     return new Payee(
                             row.getBankCode(),
                             row.getAccountNumber(),
                             row.getAccountName(),
                             instructorId,
-                            sepayId);
+                            trimToEmpty(row.getSepayAccountId()));
                 }
             }
             return platformPayee(instructorId);
@@ -640,10 +645,6 @@ public class CheckoutService {
 
     private Payee payeeOf(Payment payment, List<OrderItem> items) {
         Payee latest = resolvePayee(items.stream().map(OrderItem::getCourse).toList());
-        if (payment != null
-                && ("PENDING".equalsIgnoreCase(payment.getStatus()) || !filled(payment.getPayeeAccountNumber()))) {
-            return latest;
-        }
         if (payment != null && filled(payment.getPayeeAccountNumber()) && filled(payment.getPayeeBank())) {
             return new Payee(
                     payment.getPayeeBank(),
@@ -699,12 +700,6 @@ public class CheckoutService {
         List<OrderItem> rows = orderItems.findByOrderIdWithCourse(order.getId());
         List<CheckoutItemDTO> items = rows.stream().map(this::toItemDto).toList();
         Payee payee = payeeOf(payment, rows);
-        if ("BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())
-                && "PENDING".equalsIgnoreCase(order.getStatus())) {
-            applyPayee(payment, rows.stream().map(OrderItem::getCourse).toList());
-            payments.save(payment);
-            payee = payeeOf(payment, rows);
-        }
         BankTransferDTO bank = null;
         if ("BANK_TRANSFER".equalsIgnoreCase(payment.getProvider())) {
             String sync = firstNonBlank(sePayGateway.lastMessage(), sePayTransactions.lastMessage());
@@ -720,20 +715,6 @@ public class CheckoutService {
         }
         SePayGatewayDTO gateway = null;
         if ("PENDING".equalsIgnoreCase(order.getStatus())) {
-            Long instructorId = payee.instructorId();
-            String accountNumber = payee.accountNumber();
-            if (filled(accountNumber) && !filled(payee.sepayAccountId())) {
-                sePayTransactions.invalidateBankCache();
-                sePayTransactions.findLinkedAccount(accountNumber).ifPresent((linked) -> {
-                    if (instructorId != null) {
-                        instructorBanks.findByUser_Id(instructorId).ifPresent((row) -> {
-                            row.setSepayAccountId(linked.id());
-                            instructorBanks.save(row);
-                        });
-                    }
-                });
-                payee = payeeOf(payment, rows);
-            }
             String custom = filled(payee.accountNumber())
                     ? firstNonBlank(payee.bank(), "") + "|" + payee.accountNumber()
                     : "";

@@ -31,6 +31,7 @@ import { loadInbox } from "@/lib/inbox"
 import { loadWishlist } from "@/lib/wishlist"
 import { isAdmin, isInstructor } from "@/lib/roles"
 import { INSTRUCTOR_STUDIO } from "@/lib/teachStart"
+import AiChat from "@/components/AiChat"
 
 const AdminPage = lazy(() => import("@/admin/page"))
 
@@ -114,6 +115,7 @@ function App() {
     return (
       <>
         <CertificatePage code={certCode} />
+        <AiChat />
         <Toaster position="top-center" richColors />
       </>
     )
@@ -126,6 +128,7 @@ function App() {
     return (
       <>
         <CoursePlayerPage slug={playerSlug} />
+        <AiChat />
         <Toaster position="top-center" richColors />
       </>
     )
@@ -177,6 +180,7 @@ function App() {
         </main>
       )}
       <Footer />
+      <AiChat />
       <Toaster position="top-center" richColors />
     </div>
   )

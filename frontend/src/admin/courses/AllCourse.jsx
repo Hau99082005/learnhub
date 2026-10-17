@@ -37,7 +37,7 @@ const SELECT_CLASS =
 const OPTION_CLASS = "bg-background text-foreground dark:bg-card dark:text-card-foreground";
 
 const EMPTY = {
-  instructorId: "",
+  instructorName: "",
   categoryId: "",
   title: "",
   subtitle: "",
@@ -70,14 +70,12 @@ function statusLabel(value) {
 const AllCourse = ({
   apiBase = "/api/admin/courses",
   categoriesUrl = "/api/admin/categories",
-  showInstructor = true,
   curriculumHref = (id) => `/admin/courses/${id}/phan-hoc`,
   listHref = "/admin/courses",
   pathPattern = /^\/(?:admin|quan-tri)\/courses\/(\d+)\/phan-hoc$/,
 } = {}) => {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -93,14 +91,12 @@ const AllCourse = ({
   const load = async () => {
     setLoading(true);
     try {
-      const tasks = [authGet(apiBase), authGet(categoriesUrl)];
-      if (showInstructor) {
-        tasks.push(authGet(`${apiBase}/instructors`));
-      }
-      const [courses, cats, teachers] = await Promise.all(tasks);
+      const [courses, cats] = await Promise.all([
+        authGet(apiBase),
+        authGet(categoriesUrl),
+      ]);
       setItems(Array.isArray(courses) ? courses : []);
       setCategories(Array.isArray(cats) ? cats : []);
-      setInstructors(Array.isArray(teachers) ? teachers : []);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -123,10 +119,7 @@ const AllCourse = ({
 
   const openCreate = () => {
     setEditing(null);
-    setForm({
-      ...EMPTY,
-      instructorId: instructors[0]?.id ? String(instructors[0].id) : "",
-    });
+    setForm({ ...EMPTY });
     setFile(null);
     setPreview("");
     setVideoFile(null);
@@ -137,7 +130,7 @@ const AllCourse = ({
   const openEdit = (item) => {
     setEditing(item);
     setForm({
-      instructorId: item.instructorId ? String(item.instructorId) : "",
+      instructorName: item.instructorName || "",
       categoryId: item.categoryId ? String(item.categoryId) : "",
       title: item.title || "",
       subtitle: item.subtitle || "",
@@ -291,9 +284,7 @@ const AllCourse = ({
     payload.append("durationSeconds", String(durationSeconds || 0));
     payload.append("whatYouWillLearn", form.whatYouWillLearn);
     payload.append("requirements", form.requirements);
-    if (showInstructor && form.instructorId) {
-      payload.append("instructorId", form.instructorId);
-    }
+    payload.append("instructorName", form.instructorName.trim());
     if (form.categoryId) {
       payload.append("categoryId", form.categoryId);
     }
@@ -648,31 +639,20 @@ const AllCourse = ({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              {showInstructor ? (
-                <div className="grid gap-2">
-                  <Label htmlFor="course-instructor">Giảng viên</Label>
-                  <select
-                    id="course-instructor"
-                    className={SELECT_CLASS}
-                    value={form.instructorId}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        instructorId: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="" className={OPTION_CLASS}>
-                      Tài khoản admin hiện tại
-                    </option>
-                    {instructors.map((item) => (
-                      <option key={item.id} value={item.id} className={OPTION_CLASS}>
-                        {item.fullName} ({item.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
+              <div className="grid gap-2">
+                <Label htmlFor="course-instructor">Giảng viên</Label>
+                <Input
+                  id="course-instructor"
+                  value={form.instructorName}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      instructorName: event.target.value,
+                    }))
+                  }
+                  placeholder="Tên giảng viên hiển thị"
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="course-category">Danh mục</Label>
                 <select

@@ -32,6 +32,9 @@ public class Course {
     @JoinColumn(name = "instructor_id", nullable = false)
     private user instructor;
 
+    @Column(name = "instructor_name", length = 255)
+    private String instructorName;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
@@ -180,6 +183,24 @@ public class Course {
 
     public void setInstructor(user instructor) {
         this.instructor = instructor;
+    }
+
+    public String getInstructorName() {
+        return instructorName;
+    }
+
+    public void setInstructorName(String instructorName) {
+        this.instructorName = instructorName;
+    }
+
+    public String displayInstructorName() {
+        if (instructorName != null && !instructorName.isBlank()) {
+            return instructorName.trim();
+        }
+        if (instructor != null && instructor.getFullName() != null && !instructor.getFullName().isBlank()) {
+            return instructor.getFullName().trim();
+        }
+        return "Giảng viên LearnHub";
     }
 
     public Category getCategory() {

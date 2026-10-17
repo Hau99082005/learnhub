@@ -267,7 +267,10 @@ public class CourseServices {
         if (creating && (imageUrl == null || imageUrl.isBlank())) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Vui lòng chọn ảnh khóa học", "image");
         }
-        item.setInstructor(resolveInstructor(request.getInstructorId(), admin));
+        if (creating || item.getInstructor() == null) {
+            item.setInstructor(resolveInstructor(request.getInstructorId(), admin));
+        }
+        item.setInstructorName(resolveDisplayName(request.getInstructorName(), item.getInstructor()));
         item.setCategory(resolveCategory(request.getCategoryId()));
         item.setImages(imageUrl);
         item.setTitle(title);
@@ -523,17 +526,23 @@ public class CourseServices {
         }
     }
 
+    private String resolveDisplayName(String typed, user owner) {
+        if (typed != null && !typed.isBlank()) {
+            return typed.trim();
+        }
+        if (owner != null && owner.getFullName() != null && !owner.getFullName().isBlank()) {
+            return owner.getFullName().trim();
+        }
+        return "Giảng viên LearnHub";
+    }
+
     private CourseAdminDTO toAdminDto(Course item) {
         user instructor = item.getInstructor();
         Category category = item.getCategory();
         return new CourseAdminDTO(
                 item.getId(),
                 instructor == null ? null : instructor.getId(),
-                instructor == null
-                        ? ""
-                        : (instructor.getFullName() == null || instructor.getFullName().isBlank()
-                                ? instructor.getEmail()
-                                : instructor.getFullName()),
+                item.displayInstructorName(),
                 category == null ? null : category.getId(),
                 category == null ? "" : category.getName(),
                 item.getImages(),

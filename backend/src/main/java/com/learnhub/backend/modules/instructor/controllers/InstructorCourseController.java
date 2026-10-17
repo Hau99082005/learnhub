@@ -38,6 +38,7 @@ public class InstructorCourseController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CourseAdminDTO> create(
             @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam(required = false) String instructorName,
             @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String subtitle,
@@ -57,6 +58,7 @@ public class InstructorCourseController {
             @RequestParam(value = "image", required = false) MultipartFile image) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(courseServices.createForInstructor(authorization, toRequest(
+                        instructorName,
                         categoryId,
                         title,
                         subtitle,
@@ -79,6 +81,7 @@ public class InstructorCourseController {
     public ResponseEntity<CourseAdminDTO> update(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable Long id,
+            @RequestParam(required = false) String instructorName,
             @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String subtitle,
@@ -97,6 +100,7 @@ public class InstructorCourseController {
             @RequestParam(required = false) String previewVideo,
             @RequestParam(value = "image", required = false) MultipartFile image) {
         return ResponseEntity.ok(courseServices.updateForInstructor(authorization, id, toRequest(
+                instructorName,
                 categoryId,
                 title,
                 subtitle,
@@ -124,6 +128,7 @@ public class InstructorCourseController {
     }
 
     private AdminCourseRequest toRequest(
+            String instructorName,
             String categoryId,
             String title,
             String subtitle,
@@ -141,6 +146,7 @@ public class InstructorCourseController {
             String requirements,
             String previewVideo) {
         AdminCourseRequest request = new AdminCourseRequest();
+        request.setInstructorName(instructorName);
         request.setCategoryId(parseLong(categoryId));
         request.setTitle(title);
         request.setSubtitle(subtitle);

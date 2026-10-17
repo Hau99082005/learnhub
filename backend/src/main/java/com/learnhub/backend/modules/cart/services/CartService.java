@@ -164,7 +164,7 @@ public class CartService {
 
     private CartItemDTO toItemDto(CartItem item) {
         Course course = item.getCourse();
-        String instructor = course.getInstructor() == null ? "Giảng viên LearnHub" : course.getInstructor().getFullName();
+        String instructor = course.displayInstructorName();
         BigDecimal price = course.getPrice() == null ? BigDecimal.ZERO : course.getPrice();
         BigDecimal unit = item.getUnitPrice() == null ? price : item.getUnitPrice();
         boolean free = Boolean.TRUE.equals(course.getIsFree()) || price.compareTo(BigDecimal.ZERO) <= 0;

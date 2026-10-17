@@ -820,7 +820,7 @@ public class CheckoutService {
 
     private CheckoutItemDTO toItemDto(OrderItem item) {
         Course course = item.getCourse();
-        String instructor = course.getInstructor() == null ? "Giảng viên LearnHub" : course.getInstructor().getFullName();
+        String instructor = course.displayInstructorName();
         return new CheckoutItemDTO(
                 course.getId(),
                 item.getCourseTitle(),

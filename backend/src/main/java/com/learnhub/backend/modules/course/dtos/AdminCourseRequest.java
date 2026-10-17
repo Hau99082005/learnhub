@@ -2,6 +2,7 @@ package com.learnhub.backend.modules.course.dtos;
 
 public class AdminCourseRequest {
     private Long instructorId;
+    private String instructorName;
     private Long categoryId;
     private String title;
     private String subtitle;
@@ -25,6 +26,14 @@ public class AdminCourseRequest {
 
     public void setInstructorId(Long instructorId) {
         this.instructorId = instructorId;
+    }
+
+    public String getInstructorName() {
+        return instructorName;
+    }
+
+    public void setInstructorName(String instructorName) {
+        this.instructorName = instructorName;
     }
 
     public Long getCategoryId() {

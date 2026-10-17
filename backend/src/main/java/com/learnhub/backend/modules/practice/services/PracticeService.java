@@ -622,15 +622,7 @@ public class PracticeService {
     }
 
     private String teacher(Course course) {
-        if (course.getInstructor() == null) {
-            return "LearnHub";
-        }
-        String name = course.getInstructor().getFullName();
-        if (name != null && !name.isBlank()) {
-            return name;
-        }
-        String username = course.getInstructor().getUsername();
-        return username == null || username.isBlank() ? "LearnHub" : username;
+        return course == null ? "LearnHub" : course.displayInstructorName();
     }
 
     private String cleanTitle(String title) {

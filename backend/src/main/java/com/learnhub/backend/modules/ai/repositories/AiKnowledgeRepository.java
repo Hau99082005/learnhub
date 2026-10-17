@@ -17,7 +17,7 @@ public interface AiKnowledgeRepository extends JpaRepository<Course, Long> {
                 c.price,
                 c.currency,
                 CASE WHEN c.is_free = 1 OR c.price <= 0 THEN 1 ELSE 0 END,
-                COALESCE(u.full_name, u.username, 'LearnHub'),
+                COALESCE(NULLIF(TRIM(c.instructor_name), ''), u.full_name, u.username, 'LearnHub'),
                 COALESCE(cat.name, 'Khác'),
                 ROUND(c.duration_seconds / 3600, 1),
                 c.images,
@@ -41,7 +41,7 @@ public interface AiKnowledgeRepository extends JpaRepository<Course, Long> {
                 c.images,
                 c.price,
                 c.currency,
-                COALESCE(u.full_name, u.username, 'LearnHub'),
+                COALESCE(NULLIF(TRIM(c.instructor_name), ''), u.full_name, u.username, 'LearnHub'),
                 CASE WHEN c.is_free = 1 OR c.price <= 0 THEN 1 ELSE 0 END
             FROM enrollments e
             JOIN courses c ON c.id = e.course_id

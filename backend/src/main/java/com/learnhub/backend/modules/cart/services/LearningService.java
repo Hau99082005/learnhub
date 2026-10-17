@@ -384,18 +384,7 @@ public class LearningService {
     }
 
     private String instructorName(Course course) {
-        user instructor = course.getInstructor();
-        if (instructor == null) {
-            return "Giảng viên LearnHub";
-        }
-        String name = instructor.getFullName();
-        if (name != null && !name.isBlank()) {
-            return name;
-        }
-        if (instructor.getEmail() != null && !instructor.getEmail().isBlank()) {
-            return instructor.getEmail();
-        }
-        return "Giảng viên LearnHub";
+        return course == null ? "Giảng viên LearnHub" : course.displayInstructorName();
     }
 
     private boolean filled(String value) {

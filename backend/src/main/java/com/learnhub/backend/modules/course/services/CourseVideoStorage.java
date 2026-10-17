@@ -16,6 +16,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -27,6 +30,8 @@ import com.learnhub.backend.modules.course.dtos.VideoReadyDTO;
 import com.learnhub.backend.modules.course.dtos.VideoSessionDTO;
 import com.learnhub.backend.modules.course.support.Mp4Duration;
 import com.learnhub.backend.modules.user.exceptions.AuthException;
+
+import jakarta.annotation.PreDestroy;
 
 @Service
 public class CourseVideoStorage {
@@ -45,6 +50,13 @@ public class CourseVideoStorage {
     private final List<VideoNode> nodes;
     private final Path tempRoot;
     private final Map<String, UploadSession> sessions = new ConcurrentHashMap<>();
+    private final ExecutorService encoder = Executors.newSingleThreadExecutor(thread -> {
+        Thread worker = new Thread(thread, "learnhub-video-encode");
+        worker.setDaemon(true);
+        return worker;
+    });
+    private volatile Boolean ffmpegReady;
+    private volatile Boolean ffprobeReady;
 
     public CourseVideoStorage(
             @Value("${learnhub.video.chunk-size-bytes:8388608}") int chunkSize,
@@ -72,6 +84,11 @@ public class CourseVideoStorage {
         }
     }
 
+    @PreDestroy
+    public void shutdown() {
+        encoder.shutdownNow();
+    }
+
     public VideoSessionDTO init(VideoInitRequest request) {
         if (request == null || request.getSize() == null || request.getSize() <= 0) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Dung lượng video không hợp lệ", "video");
@@ -94,7 +111,9 @@ public class CourseVideoStorage {
         } catch (IOException ignored) {
             throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tạo phiên tải video");
         }
-        sessions.put(sessionId, new UploadSession(node.name, total, Instant.now(), work));
+        UploadSession session = new UploadSession(node.name, total, Instant.now(), work);
+        writeMeta(session);
+        sessions.put(sessionId, session);
         return new VideoSessionDTO(sessionId, chunkSize, node.name, total);
     }
 
@@ -118,23 +137,35 @@ public class CourseVideoStorage {
     }
 
     public VideoReadyDTO complete(String sessionId) {
+        return startComplete(sessionId);
+    }
+
+    public VideoReadyDTO startComplete(String sessionId) {
         UploadSession session = requireSession(sessionId);
-        Path assembled = session.work.resolve("source.bin");
-        try {
-            assemble(session, assembled);
-            VideoNode node = nodeByName(session.node);
-            String filename = UUID.randomUUID() + ".mp4";
-            Path output = node.root.resolve(filename);
-            transcode(assembled, output);
-            int duration = probeDuration(output);
-            long bytes = Files.size(output);
-            cleanup(session);
-            sessions.remove(sessionId);
-            return new VideoReadyDTO("/api/media/videos/" + node.name + "/" + filename, duration, bytes, node.name);
-        } catch (AuthException exception) {
-            throw exception;
-        } catch (IOException ignored) {
-            throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể ghép video");
+        synchronized (session.lock) {
+            if ("READY".equals(session.phase) && session.ready != null) {
+                return session.ready;
+            }
+            if ("PROCESSING".equals(session.phase)) {
+                return waitBriefly(session);
+            }
+            session.phase = "PROCESSING";
+            session.error = null;
+        }
+        encoder.execute(() -> process(session));
+        return waitBriefly(session);
+    }
+
+    public VideoReadyDTO status(String sessionId) {
+        UploadSession session = requireSession(sessionId);
+        synchronized (session.lock) {
+            if ("READY".equals(session.phase) && session.ready != null) {
+                return session.ready;
+            }
+            if ("FAILED".equals(session.phase)) {
+                return VideoReadyDTO.failed(session.error == null ? "Không thể xử lý video" : session.error);
+            }
+            return VideoReadyDTO.processing();
         }
     }
 
@@ -188,6 +219,68 @@ public class CourseVideoStorage {
         return file;
     }
 
+    public int durationOf(String videoUrl) {
+        Path file = resolvePublished(videoUrl);
+        if (file == null) {
+            return 0;
+        }
+        return probeDuration(file);
+    }
+
+    private VideoReadyDTO waitBriefly(UploadSession session) {
+        long deadline = System.currentTimeMillis() + 8000;
+        while (System.currentTimeMillis() < deadline) {
+            synchronized (session.lock) {
+                if ("READY".equals(session.phase) && session.ready != null) {
+                    return session.ready;
+                }
+                if ("FAILED".equals(session.phase)) {
+                    return VideoReadyDTO.failed(session.error == null ? "Không thể xử lý video" : session.error);
+                }
+            }
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return VideoReadyDTO.processing();
+    }
+
+    private void process(UploadSession session) {
+        try {
+            VideoReadyDTO ready = finish(session);
+            synchronized (session.lock) {
+                session.ready = ready;
+                session.phase = "READY";
+            }
+        } catch (AuthException exception) {
+            synchronized (session.lock) {
+                session.phase = "FAILED";
+                session.error = exception.getMessage();
+            }
+        } catch (Exception ignored) {
+            synchronized (session.lock) {
+                session.phase = "FAILED";
+                session.error = "Không thể ghép video";
+            }
+        }
+    }
+
+    private VideoReadyDTO finish(UploadSession session) throws IOException {
+        Path assembled = session.work.resolve("source.bin");
+        assemble(session, assembled);
+        VideoNode node = nodeByName(session.node);
+        String filename = UUID.randomUUID() + ".mp4";
+        Path output = node.root.resolve(filename);
+        transcode(assembled, output);
+        int duration = probeDuration(output);
+        long bytes = Files.size(output);
+        cleanup(session);
+        return new VideoReadyDTO("/api/media/videos/" + node.name + "/" + filename, duration, bytes, node.name);
+    }
+
     private void assemble(UploadSession session, Path assembled) throws IOException {
         try (OutputStream out = Files.newOutputStream(assembled, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -205,15 +298,34 @@ public class CourseVideoStorage {
     }
 
     private void transcode(Path input, Path output) {
-        if (!hasBinary(ffmpeg)) {
-            try {
-                Files.copy(input, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException ignored) {
-                throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu video");
-            }
+        if (hasFfmpeg() && isH264(input) && remux(input, output)) {
             return;
         }
-        List<String> command = List.of(
+        if (hasFfmpeg() && encode(input, output)) {
+            return;
+        }
+        try {
+            Files.copy(input, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ignored) {
+            throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu video");
+        }
+    }
+
+    private boolean remux(Path input, Path output) {
+        return run(List.of(
+                ffmpeg,
+                "-y",
+                "-i",
+                input.toAbsolutePath().toString(),
+                "-c",
+                "copy",
+                "-movflags",
+                "+faststart",
+                output.toAbsolutePath().toString()), 120);
+    }
+
+    private boolean encode(Path input, Path output) {
+        return run(List.of(
                 ffmpeg,
                 "-y",
                 "-i",
@@ -225,44 +337,64 @@ public class CourseVideoStorage {
                 "-c:v",
                 "libx264",
                 "-preset",
-                "veryfast",
+                "ultrafast",
+                "-threads",
+                "2",
                 "-crf",
-                "23",
+                "28",
                 "-maxrate",
-                "2500k",
+                "1800k",
                 "-bufsize",
-                "5000k",
+                "3600k",
                 "-vf",
-                "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+                "scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
                 "-c:a",
                 "aac",
                 "-b:a",
-                "128k",
+                "96k",
                 "-ac",
                 "2",
                 "-movflags",
                 "+faststart",
-                output.toAbsolutePath().toString());
-        if (!run(command, 15 * 60)) {
-            try {
-                Files.copy(input, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException ignored) {
-                throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể nén video");
-            }
-        }
+                output.toAbsolutePath().toString()), 15 * 60);
     }
 
-    public int durationOf(String videoUrl) {
-        Path file = resolvePublished(videoUrl);
-        if (file == null) {
-            return 0;
+    private boolean isH264(Path input) {
+        String codec = videoCodec(input);
+        return "h264".equals(codec) || "avc1".equals(codec);
+    }
+
+    private String videoCodec(Path input) {
+        if (!hasFfprobe()) {
+            return "";
         }
-        return probeDuration(file);
+        List<String> command = List.of(
+                ffprobe,
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "default=nw=1:nk=1",
+                input.toAbsolutePath().toString());
+        try {
+            Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            String raw = new String(process.getInputStream().readAllBytes()).trim().toLowerCase();
+            if (!process.waitFor(20, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return "";
+            }
+            return raw;
+        } catch (IOException | InterruptedException ignored) {
+            return "";
+        }
     }
 
     private int probeDuration(Path file) {
         int parsed = Mp4Duration.seconds(file);
-        if (parsed > 0 || !hasBinary(ffprobe)) {
+        if (parsed > 0 || !hasFfprobe()) {
             return parsed;
         }
         List<String> command = List.of(
@@ -277,7 +409,7 @@ public class CourseVideoStorage {
         try {
             Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
             String raw = new String(process.getInputStream().readAllBytes()).trim();
-            if (!process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 return 0;
             }
@@ -294,7 +426,7 @@ public class CourseVideoStorage {
         try {
             Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
             process.getInputStream().transferTo(OutputStream.nullOutputStream());
-            if (!process.waitFor(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 return false;
             }
@@ -304,11 +436,25 @@ public class CourseVideoStorage {
         }
     }
 
+    private boolean hasFfmpeg() {
+        if (ffmpegReady == null) {
+            ffmpegReady = hasBinary(ffmpeg);
+        }
+        return Boolean.TRUE.equals(ffmpegReady);
+    }
+
+    private boolean hasFfprobe() {
+        if (ffprobeReady == null) {
+            ffprobeReady = hasBinary(ffprobe);
+        }
+        return Boolean.TRUE.equals(ffprobeReady);
+    }
+
     private boolean hasBinary(String binary) {
         try {
             Process process = new ProcessBuilder(binary, "-version").redirectErrorStream(true).start();
             process.getInputStream().transferTo(OutputStream.nullOutputStream());
-            return process.waitFor(8, java.util.concurrent.TimeUnit.SECONDS) && process.exitValue() == 0;
+            return process.waitFor(8, TimeUnit.SECONDS) && process.exitValue() == 0;
         } catch (IOException | InterruptedException ignored) {
             return false;
         }
@@ -317,10 +463,68 @@ public class CourseVideoStorage {
     private UploadSession requireSession(String sessionId) {
         purgeExpired();
         UploadSession session = sessions.get(sessionId);
-        if (session == null) {
+        if (session != null) {
+            return session;
+        }
+        UploadSession loaded = loadFromDisk(sessionId);
+        if (loaded == null) {
             throw new AuthException(HttpStatus.NOT_FOUND, "Phiên tải video đã hết hạn");
         }
-        return session;
+        UploadSession existing = sessions.putIfAbsent(sessionId, loaded);
+        return existing == null ? loaded : existing;
+    }
+
+    private UploadSession loadFromDisk(String sessionId) {
+        if (sessionId == null || sessionId.contains("..") || sessionId.contains("/") || sessionId.contains("\\")) {
+            return null;
+        }
+        Path work = tempRoot.resolve(sessionId).normalize();
+        if (!work.startsWith(tempRoot) || !Files.isDirectory(work)) {
+            return null;
+        }
+        String node = nodes.get(0).name;
+        int total = 0;
+        Instant created = Instant.now();
+        Path meta = work.resolve("meta.txt");
+        if (Files.isRegularFile(meta)) {
+            try {
+                List<String> lines = Files.readAllLines(meta);
+                if (lines.size() >= 3) {
+                    node = lines.get(0).trim();
+                    total = Integer.parseInt(lines.get(1).trim());
+                    created = Instant.ofEpochSecond(Long.parseLong(lines.get(2).trim()));
+                }
+            } catch (IOException | NumberFormatException ignored) {
+            }
+        }
+        if (total < 1) {
+            total = countParts(work);
+        }
+        if (total < 1) {
+            return null;
+        }
+        return new UploadSession(node, total, created, work);
+    }
+
+    private int countParts(Path work) {
+        int count = 0;
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(work, "*.part")) {
+            for (Path ignored : stream) {
+                count += 1;
+            }
+        } catch (IOException ignored) {
+            return 0;
+        }
+        return count;
+    }
+
+    private void writeMeta(UploadSession session) {
+        try {
+            Files.writeString(
+                    session.work.resolve("meta.txt"),
+                    session.node + "\n" + session.totalChunks + "\n" + session.createdAt.getEpochSecond() + "\n");
+        } catch (IOException ignored) {
+        }
     }
 
     private void purgeExpired() {
@@ -332,6 +536,22 @@ public class CourseVideoStorage {
             }
             return false;
         });
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(tempRoot)) {
+            for (Path dir : stream) {
+                if (!Files.isDirectory(dir)) {
+                    continue;
+                }
+                String id = dir.getFileName().toString();
+                if (sessions.containsKey(id)) {
+                    continue;
+                }
+                UploadSession loaded = loadFromDisk(id);
+                if (loaded != null && loaded.createdAt.isBefore(limit)) {
+                    cleanup(loaded);
+                }
+            }
+        } catch (IOException ignored) {
+        }
     }
 
     private void cleanup(UploadSession session) {
@@ -398,15 +618,26 @@ public class CourseVideoStorage {
                 index += 1;
             }
         }
-        if (resolved.isEmpty()) {
-            Path drive = Paths.get("C:\\learnhub-videos");
+        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        if (resolved.isEmpty() && !windows) {
+            Path linux = Paths.get("/var/learnhub-videos/n0");
+            if (usableRoot(linux)) {
+                resolved.add(new VideoNode("n0", linux.toAbsolutePath().normalize()));
+            }
+        }
+        if (resolved.isEmpty() && windows) {
+            Path drive = Paths.get("C:\\learnhub-videos\\n0");
             if (usableRoot(drive)) {
-                resolved.add(new VideoNode("n0", drive.resolve("n0").toAbsolutePath().normalize()));
+                resolved.add(new VideoNode("n0", drive.toAbsolutePath().normalize()));
             }
         }
         if (resolved.isEmpty()) {
-            Path base = Paths.get("C:\\learnhub-videos").toAbsolutePath().normalize();
-            resolved.add(new VideoNode("n0", base.resolve("n0")));
+            Path fallback = Paths.get("uploads", "videos", "n0").toAbsolutePath().normalize();
+            try {
+                Files.createDirectories(fallback);
+            } catch (IOException ignored) {
+            }
+            resolved.add(new VideoNode("n0", fallback));
         }
         return List.copyOf(resolved);
     }
@@ -439,10 +670,21 @@ public class CourseVideoStorage {
     private record VideoNode(String name, Path root) {
     }
 
-    private record UploadSession(
-            String node,
-            int totalChunks,
-            Instant createdAt,
-            Path work) {
+    private static final class UploadSession {
+        private final String node;
+        private final int totalChunks;
+        private final Instant createdAt;
+        private final Path work;
+        private final Object lock = new Object();
+        private String phase = "UPLOADING";
+        private VideoReadyDTO ready;
+        private String error;
+
+        private UploadSession(String node, int totalChunks, Instant createdAt, Path work) {
+            this.node = node;
+            this.totalChunks = totalChunks;
+            this.createdAt = createdAt;
+            this.work = work;
+        }
     }
 }

@@ -282,7 +282,9 @@ const CourseRecord = () => {
               onClick={saveLesson}
               style={{ borderRadius: "5px" }}
             >
-              {saving ? `Đang lưu ${progress || 0}%` : "Lưu thành bài giảng"}
+              {saving
+                ? (progress >= 90 ? `Đang xử lý video ${progress}%` : `Đang lưu ${progress || 0}%`)
+                : "Lưu thành bài giảng"}
             </Button>
             {courseId ? (
               <Button

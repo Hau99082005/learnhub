@@ -586,7 +586,9 @@ const AllCourse = ({
                     onClick={uploadVideo}
                   >
                     {uploadingVideo
-                      ? `Đang tải ${videoProgress}%`
+                      ? (videoProgress >= 90
+                        ? `Đang xử lý video ${videoProgress}%`
+                        : `Đang tải ${videoProgress}%`)
                       : "Tải và nén video"}
                   </Button>
                 </div>

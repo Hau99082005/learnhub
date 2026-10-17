@@ -836,7 +836,9 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
                           style={{ borderRadius: "5px" }}
                         >
                           {uploading[section.id]
-                            ? `Đang tải ${progress[section.id] || 0}%`
+                            ? (progress[section.id] >= 90
+                              ? `Đang xử lý video ${progress[section.id]}%`
+                              : `Đang tải ${progress[section.id] || 0}%`)
                             : (lessonFiles[section.id] || []).length > 1
                               ? `Tải ${(lessonFiles[section.id] || []).length} video vào phần`
                               : "Tải video vào phần"}

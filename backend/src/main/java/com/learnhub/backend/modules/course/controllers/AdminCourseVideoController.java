@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -55,7 +56,22 @@ public class AdminCourseVideoController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable String sessionId) {
         userServices.requireInstructor(authorization);
-        return ResponseEntity.ok(videos.complete(sessionId));
+        VideoReadyDTO result = videos.startComplete(sessionId);
+        if ("FAILED".equals(result.getStatus())) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+        if ("READY".equals(result.getStatus()) && result.getPreviewVideo() != null) {
+            return ResponseEntity.ok(result);
+        }
+        return ResponseEntity.accepted().body(result);
+    }
+
+    @GetMapping("/{sessionId}/status")
+    public ResponseEntity<VideoReadyDTO> status(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable String sessionId) {
+        userServices.requireInstructor(authorization);
+        return ResponseEntity.ok(videos.status(sessionId));
     }
 
     @DeleteMapping("/{sessionId}")

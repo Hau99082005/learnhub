@@ -22,7 +22,10 @@ export async function authRequest(path, body) {
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+    throw new AuthError(
+      data.message || data.detail || data.error || "Có lỗi xảy ra, vui lòng thử lại",
+      data.field,
+    )
   }
   return data
 }
@@ -60,7 +63,10 @@ export async function authPost(path, body) {
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+    throw new AuthError(
+      data.message || data.detail || data.error || "Có lỗi xảy ra, vui lòng thử lại",
+      data.field,
+    )
   }
   return data
 }
@@ -74,7 +80,10 @@ export async function authGet(path) {
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+    throw new AuthError(
+      data.message || data.detail || data.error || "Có lỗi xảy ra, vui lòng thử lại",
+      data.field,
+    )
   }
   return data
 }
@@ -91,7 +100,10 @@ export async function authPut(path, body) {
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+    throw new AuthError(
+      data.message || data.detail || data.error || "Có lỗi xảy ra, vui lòng thử lại",
+      data.field,
+    )
   }
   return data
 }
@@ -109,7 +121,10 @@ export async function authDelete(path) {
     return true
   }
   if (!response.ok) {
-    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+    throw new AuthError(
+      data.message || data.detail || data.error || "Có lỗi xảy ra, vui lòng thử lại",
+      data.field,
+    )
   }
   return data
 }
@@ -125,7 +140,10 @@ export async function authForm(path, formData, method = "POST") {
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new AuthError(data.message || "Có lỗi xảy ra, vui lòng thử lại", data.field)
+    throw new AuthError(
+      data.message || data.detail || data.error || "Có lỗi xảy ra, vui lòng thử lại",
+      data.field,
+    )
   }
   return data
 }

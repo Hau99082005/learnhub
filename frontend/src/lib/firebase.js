@@ -34,7 +34,10 @@ export async function signInWithGoogle() {
     if (error?.code === "auth/popup-closed-by-user" || error?.code === "auth/cancelled-popup-request") {
       throw new Error("Đã đóng cửa sổ đăng nhập Google")
     }
-    if (error?.code === "auth/unauthorized-domain") {
+    if (
+      error?.code === "auth/unauthorized-domain" ||
+      String(error?.message || "").includes("unauthorized-domain")
+    ) {
       throw new Error("Tên miền chưa được phép trên Firebase")
     }
     throw new Error(error?.message || "Đăng nhập Google thất bại")

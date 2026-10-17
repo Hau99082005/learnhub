@@ -3,6 +3,7 @@ package com.learnhub.backend.modules.user.exceptions;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,5 +57,17 @@ public class ApiExceptionHandler {
         Map<String, String> body = new LinkedHashMap<>();
         body.put("message", "Không thể lưu khóa học. Kiểm tra tên, slug hoặc ràng buộc dữ liệu");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Map<String, String>> handleData(DataAccessException exception) {
+        Map<String, String> body = new LinkedHashMap<>();
+        String raw = String.valueOf(exception.getMostSpecificCause()).toLowerCase();
+        if (raw.contains("no space") || raw.contains("error 28")) {
+            body.put("message", "Ổ máy chủ gần đầy, không ghi được dữ liệu. Hãy nâng dung lượng đĩa.");
+            return ResponseEntity.status(HttpStatus.INSUFFICIENT_STORAGE).body(body);
+        }
+        body.put("message", "Không thể lưu dữ liệu, thử lại sau");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }

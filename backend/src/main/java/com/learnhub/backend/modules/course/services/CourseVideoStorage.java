@@ -42,6 +42,9 @@ public class CourseVideoStorage {
             "video/x-matroska",
             "video/x-msvideo");
     private static final long SESSION_TTL_SECONDS = 6 * 60 * 60;
+    private static final long SPACE_BUFFER_BYTES = 128L * 1024 * 1024;
+    private static final String DISK_FULL =
+            "Ổ máy chủ gần đầy, không tải thêm được video. Hãy nâng dung lượng đĩa hoặc xóa bớt video cũ.";
 
     private final int chunkSize;
     private final long maxSize;
@@ -103,12 +106,16 @@ public class CourseVideoStorage {
         int total = request.getTotalChunks() == null || request.getTotalChunks() < 1
                 ? (int) Math.ceil(request.getSize() / (double) chunkSize)
                 : request.getTotalChunks();
+        requireSpace(request.getSize() + SPACE_BUFFER_BYTES);
         VideoNode node = pickNode();
         String sessionId = UUID.randomUUID().toString();
         Path work = tempRoot.resolve(sessionId);
         try {
             Files.createDirectories(work);
-        } catch (IOException ignored) {
+        } catch (IOException exception) {
+            if (noSpace(exception)) {
+                throw new AuthException(HttpStatus.INSUFFICIENT_STORAGE, DISK_FULL, "video");
+            }
             throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tạo phiên tải video");
         }
         UploadSession session = new UploadSession(node.name, total, Instant.now(), work);
@@ -128,10 +135,24 @@ public class CourseVideoStorage {
         if (chunk.getSize() > chunkSize + 1024) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Mảnh video vượt kích thước cho phép", "video");
         }
+        try {
+            requireSpace(chunk.getSize() + (32L * 1024 * 1024));
+        } catch (AuthException exception) {
+            abort(sessionId);
+            throw exception;
+        }
         Path part = session.work.resolve(String.format("%05d.part", index));
         try (InputStream in = chunk.getInputStream()) {
             Files.copy(in, part, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ignored) {
+        } catch (IOException exception) {
+            try {
+                Files.deleteIfExists(part);
+            } catch (IOException ignored) {
+            }
+            if (noSpace(exception) || usableSpace() < 32L * 1024 * 1024) {
+                abort(sessionId);
+                throw new AuthException(HttpStatus.INSUFFICIENT_STORAGE, DISK_FULL, "video");
+            }
             throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu mảnh video");
         }
     }
@@ -269,6 +290,8 @@ public class CourseVideoStorage {
     }
 
     private VideoReadyDTO finish(UploadSession session) throws IOException {
+        long expected = (long) session.totalChunks * chunkSize;
+        requireSpace(Math.min(expected, maxSize) + SPACE_BUFFER_BYTES);
         Path assembled = session.work.resolve("source.bin");
         assemble(session, assembled);
         VideoNode node = nodeByName(session.node);
@@ -290,6 +313,7 @@ public class CourseVideoStorage {
                     throw new AuthException(HttpStatus.BAD_REQUEST, "Thiếu mảnh video " + (index + 1), "video");
                 }
                 Files.copy(part, out);
+                Files.deleteIfExists(part);
             }
         }
         if (Files.size(assembled) > maxSize) {
@@ -298,7 +322,7 @@ public class CourseVideoStorage {
     }
 
     private void transcode(Path input, Path output) {
-        if (hasFfmpeg() && isH264(input) && remux(input, output)) {
+        if (hasFfmpeg() && isH264(input) && alreadyCompact(input) && remux(input, output)) {
             return;
         }
         if (hasFfmpeg() && encode(input, output)) {
@@ -306,7 +330,10 @@ public class CourseVideoStorage {
         }
         try {
             Files.copy(input, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ignored) {
+        } catch (IOException exception) {
+            if (noSpace(exception)) {
+                throw new AuthException(HttpStatus.INSUFFICIENT_STORAGE, DISK_FULL, "video");
+            }
             throw new AuthException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu video");
         }
     }
@@ -357,6 +384,14 @@ public class CourseVideoStorage {
                 "-movflags",
                 "+faststart",
                 output.toAbsolutePath().toString()), 15 * 60);
+    }
+
+    private boolean alreadyCompact(Path input) {
+        try {
+            return Files.size(input) <= 30L * 1024 * 1024;
+        } catch (IOException ignored) {
+            return false;
+        }
     }
 
     private boolean isH264(Path input) {
@@ -552,6 +587,30 @@ public class CourseVideoStorage {
             }
         } catch (IOException ignored) {
         }
+    }
+
+    private void requireSpace(long needed) {
+        long usable = usableSpace();
+        if (usable < needed) {
+            throw new AuthException(HttpStatus.INSUFFICIENT_STORAGE, DISK_FULL, "video");
+        }
+    }
+
+    private long usableSpace() {
+        try {
+            Path probe = Files.exists(tempRoot) ? tempRoot : tempRoot.getParent();
+            if (probe == null || !Files.exists(probe)) {
+                return Long.MAX_VALUE;
+            }
+            return Files.getFileStore(probe).getUsableSpace();
+        } catch (IOException ignored) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    private static boolean noSpace(IOException exception) {
+        String message = exception.getMessage() == null ? "" : exception.getMessage().toLowerCase();
+        return message.contains("no space") || message.contains("not enough space");
     }
 
     private void cleanup(UploadSession session) {

@@ -62,7 +62,6 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
     }
 
     @Override
-    @Transactional
     public LoginReponse login(LoginRequest request) {
         String email = normalizeEmail(request.getEmail());
         String password = request.getPassword();
@@ -88,8 +87,11 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
             throw new AuthException(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không đúng");
         }
 
-        account.setLastLoginAt(LocalDateTime.now());
-        users.save(account);
+        try {
+            account.setLastLoginAt(LocalDateTime.now());
+            users.saveAndFlush(account);
+        } catch (RuntimeException ignored) {
+        }
         return toAuthResponse(account);
     }
 
@@ -152,7 +154,6 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
     }
 
     @Override
-    @Transactional
     public LoginReponse loginWithGoogle(GoogleAuthRequest request) {
         if (request == null || request.getIdToken() == null || request.getIdToken().isBlank()) {
             throw new AuthException(HttpStatus.BAD_REQUEST, "Đăng nhập Google không hợp lệ");
@@ -189,12 +190,18 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
                 account.setEmailVerified(true);
             }
             applyRole(account, resolveRole(account));
-            account.setLastLoginAt(LocalDateTime.now());
-            users.save(account);
-            instructorServices.upsertIfPresent(account, onboardingFrom(
-                    request.getTeachingFormat(),
-                    request.getRecordingExperience(),
-                    request.getAudienceSize()));
+            try {
+                account.setLastLoginAt(LocalDateTime.now());
+                users.saveAndFlush(account);
+            } catch (RuntimeException ignored) {
+            }
+            try {
+                instructorServices.upsertIfPresent(account, onboardingFrom(
+                        request.getTeachingFormat(),
+                        request.getRecordingExperience(),
+                        request.getAudienceSize()));
+            } catch (RuntimeException ignored) {
+            }
             return toAuthResponse(account);
         }
 
@@ -215,11 +222,20 @@ public class UserServices extends BaseServices implements UserServicesInterfaces
         account.setStatus("ACTIVE");
         account.setEmailVerified(Boolean.TRUE.equals(decoded.isEmailVerified()));
         account.setLastLoginAt(LocalDateTime.now());
-        users.save(account);
-        instructorServices.upsertIfPresent(account, onboardingFrom(
-                request.getTeachingFormat(),
-                request.getRecordingExperience(),
-                request.getAudienceSize()));
+        try {
+            users.saveAndFlush(account);
+        } catch (RuntimeException exception) {
+            throw new AuthException(
+                    HttpStatus.INSUFFICIENT_STORAGE,
+                    "Ổ máy chủ gần đầy, chưa tạo được tài khoản Google. Hãy nâng dung lượng đĩa.");
+        }
+        try {
+            instructorServices.upsertIfPresent(account, onboardingFrom(
+                    request.getTeachingFormat(),
+                    request.getRecordingExperience(),
+                    request.getAudienceSize()));
+        } catch (RuntimeException ignored) {
+        }
         return toAuthResponse(account);
     }
 

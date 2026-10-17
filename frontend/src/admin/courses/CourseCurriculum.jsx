@@ -83,6 +83,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
   const [lessonPreview, setLessonPreview] = useState({});
   const [lessonFiles, setLessonFiles] = useState({});
   const [progress, setProgress] = useState({});
+  const [uploadLabel, setUploadLabel] = useState({});
   const [uploading, setUploading] = useState({});
   const [playingId, setPlayingId] = useState(null);
   const [recordingLesson, setRecordingLesson] = useState(null);
@@ -263,9 +264,17 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
     }
     setUploading((prev) => ({ ...prev, [section.id]: true }));
     setProgress((prev) => ({ ...prev, [section.id]: 1 }));
+    setUploadLabel((prev) => ({
+      ...prev,
+      [section.id]: files.length > 1 ? `1/${files.length}` : "",
+    }));
     try {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
+        setUploadLabel((prev) => ({
+          ...prev,
+          [section.id]: files.length > 1 ? `${index + 1}/${files.length}` : "",
+        }));
         const ready = await uploadCourseVideo(file, (value) => {
           const overall = Math.round(((index + value / 100) / files.length) * 100);
           setProgress((prev) => ({ ...prev, [section.id]: overall }));
@@ -287,6 +296,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
       setLessonFiles((prev) => ({ ...prev, [section.id]: [] }));
       setLessonPreview((prev) => ({ ...prev, [section.id]: false }));
       setProgress((prev) => ({ ...prev, [section.id]: 0 }));
+      setUploadLabel((prev) => ({ ...prev, [section.id]: "" }));
       toast.success(
         files.length === 1
           ? "Đã thêm bài giảng"
@@ -298,6 +308,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
       await load();
     } finally {
       setUploading((prev) => ({ ...prev, [section.id]: false }));
+      setUploadLabel((prev) => ({ ...prev, [section.id]: "" }));
     }
   };
 
@@ -838,7 +849,7 @@ function CourseCurriculum({ course, onBack, apiBase, videoBase }) {
                           {uploading[section.id]
                             ? (progress[section.id] >= 90
                               ? `Đang xử lý video ${progress[section.id]}%`
-                              : `Đang tải ${progress[section.id] || 0}%`)
+                              : `Đang tải ${uploadLabel[section.id] ? `${uploadLabel[section.id]} · ` : ""}${progress[section.id] || 0}%`)
                             : (lessonFiles[section.id] || []).length > 1
                               ? `Tải ${(lessonFiles[section.id] || []).length} video vào phần`
                               : "Tải video vào phần"}
